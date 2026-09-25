@@ -1,0 +1,1 @@
+- [GitHub repository size metadata](github-size-metadata.md) — check refs and tree before treating a size-zero repository as empty.

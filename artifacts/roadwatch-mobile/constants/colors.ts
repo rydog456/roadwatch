@@ -14,46 +14,32 @@
 
 const colors = {
   light: {
-    // Legacy aliases (kept for backward compatibility)
-    text: '#0a0a0a',
-    tint: '#2f95dc',
-
-    // Core surfaces
-    background: '#ffffff',
-    foreground: '#0a0a0a',
-
-    // Cards / elevated surfaces
-    card: '#f9f9f9',
-    cardForeground: '#0a0a0a',
-
-    // Primary action color (buttons, links, active states)
-    primary: '#2f95dc',
-    primaryForeground: '#ffffff',
-
-    // Secondary / less-emphasis interactive surfaces
-    secondary: '#f0f0f0',
-    secondaryForeground: '#1a1a1a',
-
-    // Muted / subdued elements (dividers, timestamps, placeholders)
-    muted: '#f0f0f0',
-    mutedForeground: '#737373',
-
-    // Accent highlights (badges, selected items, focus rings)
-    accent: '#f0f0f0',
-    accentForeground: '#1a1a1a',
-
-    // Destructive actions (delete, error states)
-    destructive: '#ef4444',
-    destructiveForeground: '#ffffff',
-
-    // Borders and input outlines
-    border: '#e5e5e5',
-    input: '#e5e5e5',
+    text: '#1B3037',
+    tint: '#176F75',
+    background: '#F2F3ED',
+    foreground: '#1B3037',
+    card: '#FBFCF7',
+    cardForeground: '#1B3037',
+    primary: '#176F75',
+    primaryForeground: '#F8FAF5',
+    secondary: '#E2EAE6',
+    secondaryForeground: '#294A4D',
+    muted: '#E9EDE7',
+    mutedForeground: '#627578',
+    accent: '#DCEFEB',
+    accentForeground: '#155D62',
+    destructive: '#B64D3B',
+    destructiveForeground: '#FFF9F3',
+    border: '#D4DED8',
+    input: '#D4DED8',
+    ink: '#152B32',
+    inkSoft: '#29434A',
+    signal: '#D68153',
+    signalPale: '#F8E9DE',
+    success: '#3D7460',
+    grid: '#405A60',
   },
-
-  // Border radius (in px). Sync from the sibling web artifact's --radius
-  // CSS variable. This value applies to cards, buttons, inputs, and modals.
-  radius: 8,
+  radius: 14,
 };
 
 export default colors;

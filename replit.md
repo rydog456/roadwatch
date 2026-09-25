@@ -1,44 +1,53 @@
-# [Project name]
+# Roadwatch
 
-_Replace the heading above with the project's name, and this line with one sentence describing what this app does for users._
+Roadwatch is an iOS analyst dashboard for road-surface detections and nearby environmental hazards.
 
 ## Run & Operate
 
-- `pnpm --filter @workspace/api-server run dev` — run the API server (port 5000)
+- `pnpm --filter @workspace/api-server run dev` — run the API server (workflow-assigned port)
+- `pnpm --filter @workspace/roadwatch-mobile run dev` — run the Expo iOS app through its managed workflow
 - `pnpm run typecheck` — full typecheck across all packages
 - `pnpm run build` — typecheck + build all packages
 - `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from the OpenAPI spec
-- `pnpm --filter @workspace/db run push` — push DB schema changes (dev only)
-- Required env: `DATABASE_URL` — Postgres connection string
+
+Use the configured managed workflows rather than starting artifact dev commands directly. Environmental data uses public APIs and needs no API key.
 
 ## Stack
 
 - pnpm workspaces, Node.js 24, TypeScript 5.9
 - API: Express 5
-- DB: PostgreSQL + Drizzle ORM
 - Validation: Zod (`zod/v4`), `drizzle-zod`
 - API codegen: Orval (from OpenAPI spec)
-- Build: esbuild (CJS bundle)
+- Build: esbuild
+- Mobile: Expo Router and React Native
 
 ## Where things live
 
-_Populate as you build — short repo map plus pointers to the source-of-truth file for DB schema, API contracts, theme files, etc._
+- `lib/api-spec/openapi.yaml` — environmental context API contract
+- `artifacts/api-server/src/lib/environmental-context.ts` — NWS and USGS fetch, normalization, distance filtering
+- `artifacts/api-server/src/routes/road-context.ts` — validated `/api/road-context` endpoint
+- `artifacts/roadwatch-mobile/app/(tabs)/index.tsx` — analyst dashboard
+- `artifacts/roadwatch-mobile/constants/colors.ts` — app palette
 
 ## Architecture decisions
 
-_Populate as you build — non-obvious choices a reader couldn't infer from the code (3-5 bullets)._
+- Environmental reports are context, not proof of road damage or inputs that automatically override device-sensor priority.
+- The API preserves each provider's availability/error state instead of treating outages as “no hazards.”
+- NWS covers U.S. forecast points and active weather alerts; USGS supplies recent earthquake events. The server normalizes and briefly caches public responses.
 
 ## Product
 
-_Describe the high-level user-facing capabilities of this app once they exist._
+The dashboard displays a clearly labeled sample sensor-fusion detection and live NWS weather/alerts and nearby USGS earthquakes for selectable U.S. demonstration locations.
 
 ## User preferences
 
-_Populate as you build — explicit user instructions worth remembering across sessions._
+The car-mounted device will supply its own sensor readings and location. Its actual payload fields are still pending from the user.
 
 ## Gotchas
 
-_Populate as you build — sharp edges, "always run X before Y" rules._
+- Google Maps integration and a real road-severity heat map are pending a Google Maps SDK for iOS key. Never present a mock as live Google data.
+- Update the OpenAPI spec and run codegen before changing typed API consumers.
+- NWS requires an identifying User-Agent; do not remove it from server requests.
 
 ## Pointers
 

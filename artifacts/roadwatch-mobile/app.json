@@ -4,7 +4,7 @@
     "slug": "roadwatch-mobile",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
+    "icon": "./assets/images/icon_2.png",
     "scheme": "roadwatch-mobile",
     "userInterfaceStyle": "automatic",
     "ios": {
@@ -12,7 +12,7 @@
     },
     "android": {},
     "web": {
-      "favicon": "./assets/images/icon.png"
+      "favicon": "./assets/images/icon_2.png"
     },
     "plugins": ["expo-router"],
     "experiments": {

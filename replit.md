@@ -1,11 +1,12 @@
 # Roadwatch
 
-Roadwatch is an iOS analyst dashboard for road-surface detections and nearby environmental hazards.
+Roadwatch has an iOS analyst dashboard and a web dashboard for nearby environmental context. The sensor-fusion detection shown on iOS is illustrative, not live device input.
 
 ## Run & Operate
 
 - `pnpm --filter @workspace/api-server run dev` — run the API server (workflow-assigned port)
 - `pnpm --filter @workspace/roadwatch-mobile run dev` — run the Expo iOS app through its managed workflow
+- `pnpm --filter @workspace/roadwatch-web run dev` — run the web dashboard through its managed workflow
 - `pnpm run typecheck` — full typecheck across all packages
 - `pnpm run build` — typecheck + build all packages
 - `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from the OpenAPI spec
@@ -27,6 +28,7 @@ Use the configured managed workflows rather than starting artifact dev commands 
 - `artifacts/api-server/src/lib/environmental-context.ts` — NWS and USGS fetch, normalization, distance filtering
 - `artifacts/api-server/src/routes/road-context.ts` — validated `/api/road-context` endpoint
 - `artifacts/roadwatch-mobile/app/(tabs)/index.tsx` — analyst dashboard
+- `artifacts/roadwatch-web/src/pages/dashboard.tsx` — web environmental-context dashboard
 - `artifacts/roadwatch-mobile/constants/colors.ts` — app palette
 - `docs/roadwatch-data-plan.md` — proposed device fields, evidence-to-inspection workflow, and MVP boundary
 
@@ -39,7 +41,7 @@ Use the configured managed workflows rather than starting artifact dev commands 
 
 ## Product
 
-The dashboard displays a clearly labeled sample sensor-fusion detection and live NWS weather/alerts and nearby USGS earthquakes for selectable U.S. demonstration locations. GroundSignal in the supplied lean canvas is the broader venture concept; Roadwatch remains the road-focused app name unless the user chooses to rename it.
+The mobile dashboard displays a clearly labeled sample sensor-fusion detection and live NWS weather/alerts and nearby USGS earthquakes for selectable U.S. demonstration locations. The web dashboard displays the same live environmental context without device detections. GroundSignal in the supplied lean canvas is the broader venture concept; Roadwatch remains the road-focused app name unless the user chooses to rename it.
 
 ## User preferences
 

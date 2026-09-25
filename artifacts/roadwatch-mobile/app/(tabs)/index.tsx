@@ -248,8 +248,8 @@ export default function DashboardScreen() {
                       <Metric icon="wind" label="WIND" value={weather?.windSpeed || '—'} detail="Forecast speed" />
                     </View>
                     {weather?.error ? <Text style={styles.partialNotice}>{weather.error}</Text> : null}
-                    <View style={styles.subSectionHeader}><Text style={styles.subSectionTitle}>Active alerts</Text><Text style={styles.subSectionCount}>{weather?.alerts.length ?? 0} FOUND</Text></View>
-                    {weather?.alerts.length ? weather.alerts.map(alert => <AlertRow key={alert.id} alert={alert} />) : <View style={styles.emptyRow}><Feather name="check-circle" size={18} color={C.success} /><Text style={styles.emptyRowText}>No active alerts reported for this location.</Text></View>}
+                    <View style={styles.subSectionHeader}><Text style={styles.subSectionTitle}>Active alerts</Text><Text style={styles.subSectionCount}>{weather?.error?.includes('Alerts:') ? 'UNCONFIRMED' : `${weather?.alerts.length ?? 0} FOUND`}</Text></View>
+                    {weather?.alerts.length ? weather.alerts.map(alert => <AlertRow key={alert.id} alert={alert} />) : <View style={styles.emptyRow}><Feather name={weather?.error?.includes('Alerts:') ? 'alert-circle' : 'check-circle'} size={18} color={weather?.error?.includes('Alerts:') ? C.signal : C.success} /><Text style={styles.emptyRowText}>{weather?.error?.includes('Alerts:') ? 'Alert feed could not be checked; absence of alerts is not confirmed.' : 'No active alerts reported for this location.'}</Text></View>}
                   </>
                 )}
               </View>
@@ -261,7 +261,7 @@ export default function DashboardScreen() {
                 ) : (
                   <>
                     {earthquakes?.error ? <Text style={styles.partialNotice}>{earthquakes.error}</Text> : null}
-                    {earthquakes?.events.length ? earthquakes.events.map(event => <QuakeRow key={event.id} event={event} />) : <View style={styles.seismicEmpty}><View style={styles.seismicEmptyIcon}><Feather name="minus" size={22} color={C.success} /></View><Text style={styles.seismicEmptyTitle}>No nearby events reported</Text><Text style={styles.seismicEmptyBody}>No earthquake events returned within the selected radius.</Text></View>}
+                    {earthquakes?.events.length ? earthquakes.events.map(event => <QuakeRow key={event.id} event={event} />) : <View style={styles.seismicEmpty}><View style={styles.seismicEmptyIcon}><Feather name={earthquakes?.status === 'partial' ? 'alert-circle' : 'minus'} size={22} color={earthquakes?.status === 'partial' ? C.signal : C.success} /></View><Text style={styles.seismicEmptyTitle}>{earthquakes?.status === 'partial' ? 'Event coverage incomplete' : 'No nearby events reported'}</Text><Text style={styles.seismicEmptyBody}>{earthquakes?.status === 'partial' ? 'The event feed did not fully report results for this location.' : 'No earthquake events returned within the selected radius.'}</Text></View>}
                   </>
                 )}
               </View>

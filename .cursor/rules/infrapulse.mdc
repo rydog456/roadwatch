@@ -1,0 +1,7 @@
+---
+description: InfraPulse Python prototype and hardware guidance
+globs: "src/infra_pulse/**,dashboard/**,hardware/**,tests/**,run.py,requirements.txt,pyproject.toml,scripts/demo_offline.py,scripts/prepare_yolo_dataset.py"
+alwaysApply: false
+---
+
+Follow README.md and docs/infrapulse-setup.md. Keep Python's dashboard/collector, sensor fusion, and tests separate from Roadwatch's API and Expo app. Maintain screening-only claims, uncertainty, and offline capture behavior. Do not assume model weights, real sensor hardware, or live detections are available. Validate Python edits with python run.py test (or python -m pytest -q); keep captured data, datasets, and weights out of Git.

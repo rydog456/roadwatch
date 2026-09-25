@@ -1,0 +1,7 @@
+# Collaborating across Cursor, GitHub, and Replit
+
+- GitHub `main` is the review base, not a target for force pushes. Keep Replit's backup remote unchanged; `github` points to `rydog456/roadwatch`. Run `git remote -v` before pushing.
+- Fetch before branching: `git fetch github`; create a topic branch from `github/main` with `git switch -c feature/<topic> github/main`. Commit scoped changes and push the branch with `git push -u github HEAD`. Open a PR against `main` and review both the diff and checks. Do not push directly to `main`.
+- Pull upstream changes into a working branch only after committing or otherwise protecting local edits. Use `git fetch github` followed by a reviewed merge or rebase; resolve conflicts deliberately. Never use `--force` or reset local work to match the remote. Coordinate ownership of files before editing the same paths in Cursor and Replit.
+- The initial integration branch intentionally merges unrelated histories, with InfraPulse's GitHub commit and Roadwatch's Replit commits as parents. Review its PR before merging; future branches should start from the merged GitHub `main`.
+- Check Python independently (`python run.py test`) and TypeScript independently (`pnpm run typecheck`); builds need the managed artifact workflows' environment. Follow [InfraPulse setup](infrapulse-setup.md) and [Roadwatch setup](roadwatch-setup.md). Local data, dependencies, model weights, secrets, and generated build outputs stay untracked. Never commit `.env` files or credentials.

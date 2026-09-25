@@ -1,0 +1,7 @@
+---
+description: Roadwatch pnpm workspace, API contract, and app guidance
+globs: "artifacts/**,lib/**,pnpm-workspace.yaml,pnpm-lock.yaml,package.json,tsconfig*.json,replit.md"
+alwaysApply: false
+---
+
+Follow replit.md and docs/roadwatch-setup.md. API lives in artifacts/api-server; web and Expo mobile apps are separate consumers. Change lib/api-spec/openapi.yaml first for contract changes, run pnpm --filter @workspace/api-spec run codegen, then pnpm run typecheck. Do not hand-edit generated hooks/schemas; preserve provider availability/error states and the identifying NWS User-Agent. Use managed artifact workflows on Replit; do not replace them with ad-hoc servers. Run pnpm run typecheck; whole-workspace builds need workflow-provided environment variables. Mobile sensor-fusion detection is illustrative, environmental context is live, and there is no InfraPulse-to-Roadwatch ingestion.

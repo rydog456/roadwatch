@@ -1,0 +1,2 @@
+- [GitHub repository size metadata](github-size-metadata.md) — check refs and tree before treating a size-zero repository as empty.
+- [GitHub history publishing](github-history-publishing.md) — an API fallback can preserve exact history using inline text trees and verified Git object hashes.

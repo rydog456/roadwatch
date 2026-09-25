@@ -1,0 +1,8 @@
+---
+description: Git collaboration and honest product boundaries for the shared repository
+alwaysApply: true
+---
+
+This repository contains independent InfraPulse Python and Roadwatch pnpm/TypeScript projects. Read README.md and docs/collaboration.md before moving files across project boundaries. Do not connect their pipelines implicitly.
+Work on a topic branch based on fetched github/main, preserve uncommitted edits, and open a PR for review. Never force-push or push directly to main; leave Replit's backup remote intact. Avoid committing .env files, local data, dependencies, datasets, model weights, and generated build files.
+InfraPulse is screening, not structural certification. Roadwatch's mobile detection is illustrative; only NWS/USGS environmental context is live. Do not describe a real device ingest or road-condition inference from environmental data.

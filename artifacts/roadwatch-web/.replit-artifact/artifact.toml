@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/"
+title = "Roadwatch Web"
+description = "A road-condition command center for public works teams with location dashboards, live environmental context, and browser-camera screening that flags potential potholes and road defects for human review."
+version = "1.0.0"
+id = "artifacts/roadwatch-web"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 20145
+
+[services.development]
+run = "pnpm --filter @workspace/roadwatch-web run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/roadwatch-web", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/roadwatch-web/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "20145"
+BASE_PATH = "/"

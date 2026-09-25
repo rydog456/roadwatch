@@ -1,5 +1,16 @@
 # InfraPulse
 
+This repository contains **two independent projects**, not one combined sensor pipeline:
+
+| Project | Location | Start and validate |
+| --- | --- | --- |
+| InfraPulse | `src/infra_pulse/`, `dashboard/`, `hardware/`, `tests/` | [Python setup](docs/infrapulse-setup.md) |
+| Roadwatch | `artifacts/`, `lib/`, `pnpm-workspace.yaml` | [Web, mobile, and API setup](docs/roadwatch-setup.md) |
+
+InfraPulse is a Python pavement-screening prototype with an optional hardware collector. Roadwatch currently shows **illustrative** sensor-fusion detection on mobile, while its NWS weather/alerts and USGS earthquake context is **live** public data for selected demo cities; its web view shows environmental context without device detections. Neither project certifies structural safety. They do not share an ingestion API.
+
+For collaboration, use a feature branch and pull request rather than pushing directly to `main`. See [branch and Cursor guidance](docs/collaboration.md).
+
 Turn vehicles that already drive the network into **autonomous pavement inspectors**: detect distress, corroborate it with motion/geometry, score **inspection priority**, and emit a ranked recovery queue.
 
 This is a **screening system**. Outputs are condition / priority scores, not a statement that a bridge or road is structurally safe.
@@ -60,9 +71,9 @@ Weekend: phone + MPU-6050 + GPS. Next dollars: cleaner IMU (ICM-42688, 200 Hz+),
 
 ## Run the demo (laptop, no hardware)
 
-```powershell
-cd C:\Users\admin\infra-pulse
-.\.venv\Scripts\Activate.ps1
+From the repository root after [installing the Python requirements](docs/infrapulse-setup.md):
+
+```sh
 python run.py demo
 python run.py offline
 python run.py test

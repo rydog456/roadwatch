@@ -1,1 +1,2 @@
 - [GitHub repository size metadata](github-size-metadata.md) — check refs and tree before treating a size-zero repository as empty.
+- [GitHub history publishing](github-history-publishing.md) — connector API can rate-limit bulk Git objects; prefer Git transport for unrelated-history integration.

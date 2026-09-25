@@ -186,7 +186,7 @@ export default function DashboardScreen() {
               <View style={styles.priority}><Text style={styles.priorityText}>HIGH PRIORITY</Text></View>
             </View>
             <View style={styles.defectHeading}><View style={styles.defectGlyph}><Feather name="activity" size={22} color={C.signal} /></View><View style={{ flex: 1 }}><Text style={styles.defectKicker}>SAMPLE FUSION DETECTION / 001</Text><Text style={styles.defectTitle}>Pothole</Text></View></View>
-            <View style={styles.confidenceRow}><View><Label light>MODEL CONFIDENCE</Label><Text style={styles.confidenceNote}>Illustrative device-fusion result</Text></View><Text style={styles.confidenceValue}>92<Text style={styles.confidencePercent}>%</Text></Text></View>
+            <View style={styles.confidenceRow}><View><Label light>VISION CONFIDENCE</Label><Text style={styles.confidenceNote}>Illustrative screening result</Text></View><Text style={styles.confidenceValue}>92<Text style={styles.confidencePercent}>%</Text></Text></View>
             <View style={styles.confidenceTrack}><View style={styles.confidenceFill} /></View>
             <View style={styles.evidenceMetrics}>
               <View style={styles.evidenceMetric}><Text style={styles.evidenceMetricLabel}>LiDAR DEPTH</Text><Text style={styles.evidenceMetricValue}>43 <Text style={styles.evidenceMetricUnit}>mm</Text></Text></View>
@@ -196,8 +196,23 @@ export default function DashboardScreen() {
             <Text style={styles.evidenceDisclaimer}>Example readings only. A device payload format and live sensor connection have not been supplied.</Text>
           </View>
 
+          <View style={styles.recommendationSection}>
+            <SectionHeading index="02" title="Inspection recommendation" meta="DEMO" />
+            <View style={styles.recommendationCard}>
+              <View style={styles.recommendationHeader}>
+                <View style={styles.recommendationSymbol}><Feather name="clipboard" size={20} color={C.primary} /></View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.recommendationKicker}>HIGH SCREENING PRIORITY</Text>
+                  <Text style={styles.recommendationTitle}>Targeted pavement inspection</Text>
+                </View>
+              </View>
+              <Text style={styles.recommendationReason}>Why this surfaced: the sample vision result identifies a pothole at 92% confidence, alongside a 43 mm LiDAR depth reading and a 3.1σ IMU impact. Together, these merit a closer look—not a structural-safety diagnosis.</Text>
+              <View style={styles.reviewBanner}><Feather name="user-check" size={17} color={C.primary} /><Text style={styles.reviewBannerText}>Human review required before any field action. No automatic dispatch.</Text></View>
+            </View>
+          </View>
+
           <View style={styles.contextIntro}>
-            <SectionHeading index="02" title="Environmental context" meta="LIVE API" />
+            <SectionHeading index="03" title="Environmental context" meta="LIVE API" />
             <Text style={styles.contextDescription}>Government source data for the selected demonstration location. Context is not defect evidence.</Text>
           </View>
           <View style={styles.contextToolbar}>
@@ -226,13 +241,12 @@ export default function DashboardScreen() {
                 ) : (
                   <>
                     {weather?.temperature != null || weather?.shortForecast ? (
-                      <View style={styles.weatherMain}><Text style={styles.temperature}>{weather.temperature != null ? `${Math.round(weather.temperature)}°` : '—'}</Text><View style={{ flex: 1 }}><Text style={styles.temperatureUnit}>{weather.temperatureUnit || 'TEMPERATURE'}</Text><Text style={styles.forecast}>{weather.shortForecast || 'Forecast not reported'}</Text></View></View>
-                    ) : <Text style={styles.inlineEmpty}>Current conditions were not reported by this provider.</Text>}
+                      <View style={styles.weatherMain}><Text style={styles.temperature}>{weather.temperature != null ? `${Math.round(weather.temperature)}°` : '—'}</Text><View style={{ flex: 1 }}><Text style={styles.temperatureUnit}>FORECAST {weather.temperatureUnit || 'TEMPERATURE'}</Text><Text style={styles.forecast}>{weather.shortForecast || 'Forecast not reported'}</Text></View></View>
+                    ) : <Text style={styles.inlineEmpty}>Hourly forecast was not reported by this provider.</Text>}
                     <View style={styles.weatherMetrics}>
                       <Metric icon="droplet" label="PRECIPITATION" value={weather?.precipitationProbability != null ? `${weather.precipitationProbability}` : '—'} unit={weather?.precipitationProbability != null ? '%' : undefined} detail="Probability" />
-                      <Metric icon="wind" label="WIND" value={weather?.windSpeed || '—'} detail="Reported speed" />
+                      <Metric icon="wind" label="WIND" value={weather?.windSpeed || '—'} detail="Forecast speed" />
                     </View>
-                    <Text style={styles.observed}>OBSERVED  {formatTime(weather?.observedAt)}</Text>
                     {weather?.error ? <Text style={styles.partialNotice}>{weather.error}</Text> : null}
                     <View style={styles.subSectionHeader}><Text style={styles.subSectionTitle}>Active alerts</Text><Text style={styles.subSectionCount}>{weather?.alerts.length ?? 0} FOUND</Text></View>
                     {weather?.alerts.length ? weather.alerts.map(alert => <AlertRow key={alert.id} alert={alert} />) : <View style={styles.emptyRow}><Feather name="check-circle" size={18} color={C.success} /><Text style={styles.emptyRowText}>No active alerts reported for this location.</Text></View>}
@@ -254,6 +268,22 @@ export default function DashboardScreen() {
               <Text style={styles.generatedAt}>CONTEXT GENERATED  {formatTime(data?.generatedAt)}{'\n'}SOURCE LOCATION  {data?.location.latitude.toFixed(4)}, {data?.location.longitude.toFixed(4)}</Text>
             </>
           )}
+          <View style={styles.dataSection}>
+            <SectionHeading index="04" title="Data needed from device" />
+            <Text style={styles.dataIntro}>Use existing fleet vehicles to collect camera, IMU and GPS evidence. LiDAR and thermal readings enrich a pass when available.</Text>
+            <View style={styles.dataCard}>
+              <View style={styles.dataGroupHeading}><View style={styles.coreDot} /><Text style={styles.dataGroupLabel}>CORE PAYLOAD</Text></View>
+              <View style={styles.dataRow}><Text style={styles.dataRowName}>Identity</Text><Text style={styles.dataRowValue}>Event ID · Device ID · ISO timestamp</Text></View>
+              <View style={styles.dataRow}><Text style={styles.dataRowName}>Position</Text><Text style={styles.dataRowValue}>GPS coordinates · Accuracy</Text></View>
+              <View style={styles.dataRow}><Text style={styles.dataRowName}>Vision</Text><Text style={styles.dataRowValue}>Class · Confidence · Image reference</Text></View>
+              <View style={styles.dataRow}><Text style={styles.dataRowName}>Motion</Text><Text style={styles.dataRowValue}>Calibrated IMU impact · Vehicle speed</Text></View>
+              <View style={styles.optionalGroup}>
+                <View style={styles.dataGroupHeading}><View style={styles.optionalDot} /><Text style={styles.dataGroupLabel}>OPTIONAL ENRICHMENT</Text></View>
+                <Text style={styles.optionalText}>LiDAR depth · Thermal delta · Segment ID · Repeat-pass history</Text>
+              </View>
+            </View>
+            <View style={styles.trendNote}><Feather name="layers" size={16} color={C.mutedForeground} /><Text style={styles.trendNoteText}>Trends and repair verification require repeated, dated observations of the same road segment. This single demo detection cannot show either.</Text></View>
+          </View>
           <View style={styles.footerNote}><Feather name="map" size={16} color={C.mutedForeground} /><Text style={styles.footerNoteText}>Map integration awaits a Google Maps SDK key. No map or device position is shown here.</Text></View>
           <View style={styles.footerRule} /><Text style={styles.footerBrand}>ROADWATCH  /  ANALYST VIEW</Text>
         </View>
@@ -325,6 +355,29 @@ const styles = StyleSheet.create({
   evidenceMetricValue: { color: '#F4F7EF', fontSize: 22, fontWeight: '700', letterSpacing: -.6, marginTop: 7 },
   evidenceMetricUnit: { fontSize: 13, color: '#AEC4BB', fontWeight: '400' },
   evidenceDisclaimer: { color: '#829D9B', fontSize: 10, lineHeight: 15, borderTopWidth: 1, borderTopColor: C.grid, marginTop: 18, paddingVertical: 13 },
+  recommendationSection: { marginTop: 28 },
+  recommendationCard: { backgroundColor: C.card, borderWidth: 1, borderColor: C.border, borderRadius: 14, padding: 18, borderLeftWidth: 4, borderLeftColor: C.signal },
+  recommendationHeader: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  recommendationSymbol: { height: 39, width: 39, borderRadius: 9, alignItems: 'center', justifyContent: 'center', backgroundColor: C.accent },
+  recommendationKicker: { fontFamily: MONO, color: '#98623F', fontSize: 9, fontWeight: '700', letterSpacing: .6 },
+  recommendationTitle: { color: C.foreground, fontSize: 17, fontWeight: '700', letterSpacing: -.4, marginTop: 4 },
+  recommendationReason: { color: C.inkSoft, fontSize: 12, lineHeight: 19, marginTop: 17 },
+  reviewBanner: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12, borderRadius: 8, backgroundColor: C.accent, marginTop: 17 },
+  reviewBannerText: { color: C.accentForeground, fontSize: 11, fontWeight: '600', lineHeight: 16, flex: 1 },
+  dataSection: { marginTop: 30 },
+  dataIntro: { color: C.mutedForeground, fontSize: 12, lineHeight: 18, marginTop: -4, marginBottom: 14 },
+  dataCard: { backgroundColor: C.card, borderWidth: 1, borderColor: C.border, borderRadius: 14, paddingHorizontal: 17, paddingTop: 17, paddingBottom: 16 },
+  dataGroupHeading: { flexDirection: 'row', alignItems: 'center', gap: 7, marginBottom: 10 },
+  coreDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: C.primary },
+  optionalDot: { width: 6, height: 6, borderRadius: 3, borderWidth: 1, borderColor: C.mutedForeground },
+  dataGroupLabel: { fontFamily: MONO, fontWeight: '700', fontSize: 9, color: C.mutedForeground, letterSpacing: .7 },
+  dataRow: { flexDirection: 'row', borderTopWidth: 1, borderTopColor: C.border, paddingVertical: 11, gap: 9 },
+  dataRowName: { color: C.foreground, fontWeight: '700', fontSize: 11, width: 58 },
+  dataRowValue: { color: C.inkSoft, fontSize: 11, lineHeight: 16, flex: 1 },
+  optionalGroup: { paddingTop: 15, borderTopWidth: 1, borderTopColor: C.border },
+  optionalText: { color: C.inkSoft, fontSize: 11, lineHeight: 17 },
+  trendNote: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, paddingHorizontal: 3, marginTop: 13 },
+  trendNoteText: { color: C.mutedForeground, fontSize: 11, lineHeight: 17, flex: 1 },
   contextIntro: { marginTop: 34 },
   contextDescription: { color: C.mutedForeground, fontSize: 12, lineHeight: 18, marginBottom: 16, marginTop: -5 },
   contextToolbar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
@@ -365,7 +418,6 @@ const styles = StyleSheet.create({
   metricValue: { fontSize: 20, fontWeight: '700', color: C.foreground },
   metricUnit: { fontSize: 12, color: C.mutedForeground },
   metricDetail: { color: C.mutedForeground, fontSize: 10, marginTop: 2 },
-  observed: { color: C.mutedForeground, fontFamily: MONO, fontSize: 9, marginTop: 20, letterSpacing: .2 },
   subSectionHeader: { borderTopWidth: 1, borderTopColor: C.border, marginTop: 19, paddingTop: 16, flexDirection: 'row', justifyContent: 'space-between' },
   subSectionTitle: { fontSize: 14, fontWeight: '700', color: C.foreground },
   subSectionCount: { fontFamily: MONO, fontSize: 9, color: C.mutedForeground },

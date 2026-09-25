@@ -28,16 +28,18 @@ Use the configured managed workflows rather than starting artifact dev commands 
 - `artifacts/api-server/src/routes/road-context.ts` — validated `/api/road-context` endpoint
 - `artifacts/roadwatch-mobile/app/(tabs)/index.tsx` — analyst dashboard
 - `artifacts/roadwatch-mobile/constants/colors.ts` — app palette
+- `docs/roadwatch-data-plan.md` — proposed device fields, evidence-to-inspection workflow, and MVP boundary
 
 ## Architecture decisions
 
 - Environmental reports are context, not proof of road damage or inputs that automatically override device-sensor priority.
 - The API preserves each provider's availability/error state instead of treating outages as “no hazards.”
 - NWS covers U.S. forecast points and active weather alerts; USGS supplies recent earthquake events. The server normalizes and briefly caches public responses.
+- Focus the near-term product on repeatable pavement screening from existing vehicle routes (camera + IMU + GPS); LiDAR/thermal are optional, and structural/NDT claims require qualified follow-up. Inspection priority is a screening recommendation requiring human review, not a safety certification.
 
 ## Product
 
-The dashboard displays a clearly labeled sample sensor-fusion detection and live NWS weather/alerts and nearby USGS earthquakes for selectable U.S. demonstration locations.
+The dashboard displays a clearly labeled sample sensor-fusion detection and live NWS weather/alerts and nearby USGS earthquakes for selectable U.S. demonstration locations. GroundSignal in the supplied lean canvas is the broader venture concept; Roadwatch remains the road-focused app name unless the user chooses to rename it.
 
 ## User preferences
 

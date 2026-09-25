@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>InfraPulse — pavement screening</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <style>
+    :root { font-family: "Segoe UI", system-ui, sans-serif; color: #e8eef7; background: #0b1220; }
+    body { margin: 0; }
+    header { padding: 16px 22px; border-bottom: 1px solid #1e2a44; display: flex; justify-content: space-between; align-items: center; }
+    h1 { font-size: 18px; margin: 0; letter-spacing: 0.04em; }
+    .muted { color: #8ba0bf; font-size: 13px; }
+    main { display: grid; grid-template-columns: 1.4fr 1fr; min-height: calc(100vh - 62px); }
+    #map { min-height: 480px; }
+    aside { padding: 16px; overflow: auto; border-left: 1px solid #1e2a44; }
+    .kpi { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
+    .card { background: #121b2e; border: 1px solid #243353; border-radius: 10px; padding: 10px 12px; min-width: 110px; }
+    .card b { display: block; font-size: 20px; }
+    .row { background: #121b2e; border: 1px solid #243353; border-radius: 10px; padding: 10px 12px; margin-bottom: 8px; }
+    .tag { display: inline-block; font-size: 11px; padding: 2px 8px; border-radius: 99px; text-transform: uppercase; }
+    .high, .emergency { background: #5b1d2a; color: #ffb4c1; }
+    .medium { background: #4a3b12; color: #ffd978; }
+    .low, .monitor { background: #163326; color: #9be7b7; }
+    .delayed { background: #2a2150; color: #cbb6ff; }
+    button { background: #2f6fed; color: white; border: 0; border-radius: 8px; padding: 8px 12px; cursor: pointer; }
+    header .actions { display: flex; gap: 8px; }
+  </style>
+</head>
+<body>
+  <header>
+    <div>
+      <h1>INFRAPULSE</h1>
+      <div class="muted">Identify → corroborate → prioritize → dispatch. Integrity index is a screen, not a certificate.</div>
+    </div>
+    <div class="actions">
+      <button id="sync">Flush delayed outbox</button>
+      <button id="refresh">Re-run fusion</button>
+    </div>
+  </header>
+  <main>
+    <div id="map"></div>
+    <aside>
+      <div class="kpi" id="kpis"></div>
+      <h3>Ranked queue</h3>
+      <div id="list"></div>
+      <h3>Crew coverage</h3>
+      <div id="cov" class="muted"></div>
+      <h3>Offline / delayed ingest</h3>
+      <div id="outbox" class="muted"></div>
+      <div id="hub"></div>
+    </aside>
+  </main>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script>
+    const map = L.map("map").setView([34.055, -118.246], 14);
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19 }).addTo(map);
+    let layer = L.layerGroup().addTo(map);
+    const colors = { emergency: "#ff4d6d", high: "#ff7a59", medium: "#ffd166", low: "#70e000", monitor: "#4cc9f0" };
+
+    function render(data) {
+      layer.clearLayers();
+      if (!data || !data.summary) {
+        document.getElementById("kpis").innerHTML = "<div class='card'>Could not load run</div>";
+        return;
+      }
+      const s = data.summary;
+      document.getElementById("kpis").innerHTML = `
+        <div class="card"><span class="muted">Segments</span><b>${s.segments}</b></div>
+        <div class="card"><span class="muted">Work orders</span><b>${s.work_orders}</b></div>
+        <div class="card"><span class="muted">High+</span><b>${s.high_or_worse}</b></div>
+        <div class="card"><span class="muted">Mean integrity</span><b>${s.mean_integrity ?? "—"}</b></div>
+        <div class="card"><span class="muted">NDT / modal</span><b>${s.ndt_or_modal ?? 0}</b></div>`;
+      document.getElementById("cov").textContent =
+        `Assign ${data.coverage.crews} crews → jobs ${data.coverage.assigned_ids.join(", ") || "none"}`;
+      const list = document.getElementById("list");
+      list.innerHTML = "";
+      const ranked = [...data.events].sort((a,b) => b.priority_score - a.priority_score);
+      ranked.forEach(e => {
+        const loc = e.location;
+        L.circleMarker([loc.lat, loc.lon], {
+          radius: 9, color: colors[e.priority] || "#fff", fillOpacity: 0.85
+        }).bindPopup(`<b>${e.segment_id}</b><br>priority ${e.priority} (${e.priority_score.toFixed(0)})<br>integrity ${e.integrity_index?.toFixed(0)}/100<br>${e.claim || ""}<br>${e.recommended_action}`).addTo(layer);
+        const div = document.createElement("div");
+        div.className = "row";
+        div.innerHTML = `<span class="tag ${e.priority}">${e.priority}</span>
+          <b> ${e.segment_id}</b> <span class="muted">I=${e.integrity_index?.toFixed(0)} ${e.claim || ""}</span>
+          <div class="muted">${e.explanation}</div>`;
+        list.appendChild(div);
+      });
+    }
+
+    async function loadOutbox() {
+      const [o, h] = await Promise.all([
+        fetch("/api/outbox").then(r => r.json()).catch(() => ({pending: 0})),
+        fetch("/api/hub").then(r => r.json()).catch(() => ({records: []})),
+      ]);
+      document.getElementById("outbox").textContent =
+        `Device pending ${o.pending ?? 0} · delayed already synced ${o.delayed_synced ?? 0} · radio ${o.online_now ? "up" : "down"}`;
+      const hub = document.getElementById("hub");
+      hub.innerHTML = "";
+      (h.records || []).slice(0, 8).forEach(rec => {
+        const d = rec.hub || {};
+        const div = document.createElement("div");
+        div.className = "row";
+        div.innerHTML = `${d.delayed ? '<span class="tag delayed">delayed</span>' : '<span class="tag monitor">live</span>'}
+          ${rec.kind || rec.segment_id || rec.id || "record"}
+          <div class="muted">delay ${d.delay_s ?? "?"}s · captured ${d.captured_at ? new Date(d.captured_at*1000).toLocaleTimeString() : ""}</div>`;
+        hub.appendChild(div);
+      });
+    }
+
+    async function load(refresh=false) {
+      try {
+        const r = await fetch("/api/run" + (refresh ? "?refresh=true" : ""));
+        if (!r.ok) throw new Error("run " + r.status);
+        render(await r.json());
+      } catch (err) {
+        document.getElementById("kpis").innerHTML = "<div class='card'>API error</div>";
+        console.error(err);
+      }
+      loadOutbox();
+    }
+    document.getElementById("refresh").onclick = () => load(true);
+    document.getElementById("sync").onclick = async () => {
+      await fetch("/api/sync-now", {method: "POST"});
+      loadOutbox();
+    };
+    load();
+  </script>
+</body>
+</html>

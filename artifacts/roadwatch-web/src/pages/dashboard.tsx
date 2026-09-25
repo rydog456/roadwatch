@@ -129,7 +129,7 @@ export default function Dashboard() {
   return (
     <div className="app-shell">
       <aside className="rail">
-        <a href="/" className="brand" data-testid="link-home" aria-label="Roadwatch home"><span className="brand-mark"><Compass size={21} strokeWidth={1.8} /></span><span><span className="brand-name">roadwatch<span style={{ color: 'var(--rw-pink)' }}>.</span></span><span className="brand-sub">Public works intelligence</span></span></a>
+        <a href="/" className="brand" data-testid="link-home" aria-label="Roadwatch home"><span className="brand-mark"><Compass size={21} strokeWidth={1.8} /></span><span className="brand-name">roadwatch<span style={{ color: 'var(--rw-pink)' }}>.</span></span></a>
         <div className="rail-label">Workspace</div>
         <nav aria-label="Main navigation"><div className="rail-item active" aria-current="page"><CircleDot size={17} /><span>Context overview</span></div></nav>
         <div className="rail-bottom"><div className="eyebrow"><span className="live-dot" /> PUBLIC DATA LAYER</div><p>Environmental context for planning, not a road-condition detection system.</p></div>

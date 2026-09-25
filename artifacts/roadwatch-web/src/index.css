@@ -139,10 +139,9 @@ h1,h2,h3,p { margin-top: 0; }
 /* The dashboard sits on a soft stage, like the reference's rounded page compositions. */
 .app-shell { width: min(1500px, calc(100% - 64px)); min-height: calc(100dvh - 64px); margin: 32px auto; background: var(--rw-canvas); border-radius: 22px; box-shadow: 0 18px 65px rgb(29 22 47 / .07); overflow: clip; }
 .rail { min-height: 76px; display: flex; align-items: center; gap: clamp(22px, 5vw, 90px); padding: 17px clamp(28px, 4.3vw, 76px); border-bottom: 1px solid var(--rw-line); }
-.brand { display: inline-flex; align-items: center; gap: 10px; color: var(--rw-ink); text-decoration: none; flex: none; }
-.brand-mark { width: 33px; height: 33px; border-radius: 9px; display: grid; place-items: center; color: var(--rw-canvas); background: var(--rw-violet); transform: rotate(-9deg); }
-.brand-name { font: 800 22px/1 var(--rw-font-display); letter-spacing: -.095em; }
-.brand-sub { display: block; margin-top: 4px; color: var(--rw-muted); font: 8px/1.2 var(--rw-font-mono); text-transform: uppercase; letter-spacing: -.03em; }
+.brand { display: inline-flex; align-items: center; gap: 14px; color: var(--rw-ink); text-decoration: none; flex: none; }
+.brand-mark { width: 36px; height: 36px; border-radius: 10px; display: grid; place-items: center; color: var(--rw-canvas); background: var(--rw-violet); transform: rotate(-9deg); flex: none; }
+.brand-name { font: 700 22px/1.1 var(--rw-font-display); letter-spacing: -.045em; white-space: nowrap; }
 .rail-label { display: none; }
 .rail nav { margin-inline: auto; }
 .rail-item { display: flex; align-items: center; gap: 8px; padding: 10px 16px; border-radius: 9px; background: #f7f6f7; color: var(--rw-ink); font-size: 12px; font-weight: 700; white-space: nowrap; }
@@ -272,7 +271,6 @@ h1,h2,h3,p { margin-top: 0; }
   .app-shell { width: 100%; margin: 0; border-radius: 0; min-height: 100dvh; }
   .rail { min-height: 68px; padding: 14px 20px; }
   .brand-name { font-size: 20px; }
-  .brand-sub { font-size: 7px; }
   .rail-item { padding: 10px; }
   .rail-item span { display: none; }
   .topbar { padding: 12px 20px 0; }

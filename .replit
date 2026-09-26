@@ -1,0 +1,16 @@
+modules = ["python-3.12"]
+run = "pip install -q -r requirements-web.txt && python run.py serve"
+entrypoint = "run.py"
+
+[nix]
+channel = "stable-24_05"
+
+[deployment]
+run = ["sh", "-c", "pip install -q -r requirements-web.txt && python run.py serve"]
+
+[[ports]]
+localPort = 8000
+externalPort = 80
+
+[env]
+PORT = "8000"

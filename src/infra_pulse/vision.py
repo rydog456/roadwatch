@@ -3,8 +3,12 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Optional, Union
 
-import cv2
 import numpy as np
+
+try:
+    import cv2
+except ImportError:
+    cv2 = None
 
 from infra_pulse.config import YOLO_CONF, YOLO_IMGSZ, YOLO_LABEL_MAP
 from infra_pulse.models import BoundingBox, DistressClass, VisionResult
@@ -15,7 +19,7 @@ ImageLike = Union[str, Path, np.ndarray]
 def _load_bgr(image: ImageLike) -> np.ndarray:
     if isinstance(image, np.ndarray):
         return image
-    img = cv2.imread(str(image))
+    img = cv2.imread(str(image)) if cv2 is not None else None
     if img is None:
         raise FileNotFoundError(image)
     return img
@@ -23,6 +27,8 @@ def _load_bgr(image: ImageLike) -> np.ndarray:
 
 def classical_distress(image: ImageLike) -> list[BoundingBox]:
     """Fallback crack/pothole cues when a custom YOLO11 weight is not trained yet."""
+    if cv2 is None:
+        return []
     bgr = _load_bgr(image)
     h, w = bgr.shape[:2]
     gray = cv2.cvtColor(bgr, cv2.COLOR_BGR2GRAY)

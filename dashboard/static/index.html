@@ -13,7 +13,7 @@
     .muted { color: #8ba0bf; font-size: 13px; }
     main { display: grid; grid-template-columns: 1.4fr 1fr; min-height: calc(100vh - 62px); }
     #map { min-height: 480px; }
-    aside { padding: 16px; overflow: auto; border-left: 1px solid #1e2a44; }
+    #panel { padding: 16px; overflow: auto; border-left: 1px solid #1e2a44; }
     .kpi { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
     .card { background: #121b2e; border: 1px solid #243353; border-radius: 10px; padding: 10px 12px; min-width: 110px; }
     .card b { display: block; font-size: 20px; }
@@ -29,13 +29,18 @@
     .low, .monitor { background: #163326; color: #9be7b7; }
     .delayed { background: #2a2150; color: #cbb6ff; }
     button { background: #2f6fed; color: white; border: 0; border-radius: 8px; padding: 8px 12px; cursor: pointer; }
+    button.primary { width: 100%; margin-top: 8px; padding: 12px; font-size: 16px; }
+    button.ghost { background: transparent; border: 1px solid #243353; }
     .scan .actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+    details { margin-top: 16px; }
+    summary { cursor: pointer; color: #8ba0bf; }
     @media (max-width: 800px) {
       header { flex-direction: column; align-items: flex-start; gap: 8px; }
       main { display: flex; flex-direction: column; }
-      aside { order: -1; border-left: 0; border-bottom: 1px solid #1e2a44; }
-      #map { min-height: 240px; }
-      .scan input { font-size: 16px; }
+      #panel { order: 1; border-left: 0; }
+      #map { order: 2; min-height: 280px; }
+      .scan input, .scan button { font-size: 16px; }
+      iframe.calc { height: 70vh; }
     }
     header .actions { display: flex; gap: 8px; }
   </style>
@@ -44,32 +49,27 @@
   <header>
     <div>
       <h1>INFRAPULSE</h1>
-      <div class="muted">iPhone LiDAR + LA-weighted LLM. Integrity index is a screen, not a certificate.</div>
-    </div>
-    <div class="actions">
-      <button id="sync">Flush delayed outbox</button>
-      <button id="refresh">Re-run fusion</button>
+      <div class="muted">Scan a PLY, price the hole, drop the pin on the map.</div>
     </div>
   </header>
   <main>
     <div id="map"></div>
-    <aside>
-      <div class="kpi" id="kpis"></div>
-      <h3>Scan a pothole</h3>
+    <div id="panel">
+      <h3>Scan</h3>
       <form class="scan" id="scan-form" onsubmit="return false">
         <label>Who scanned</label>
         <input id="who" value="ryan" />
         <label>Latitude</label>
-        <input id="lat" value="34.0522" />
+        <input id="lat" value="34.0522" inputmode="decimal" />
         <label>Longitude</label>
-        <input id="lon" value="-118.2437" />
-        <label>iPhone LiDAR file (.ply)</label>
+        <input id="lon" value="-118.2437" inputmode="decimal" />
+        <label>LiDAR file (.ply)</label>
         <input id="ply" type="file" accept="*/*" />
-        <p class="muted">On the iPhone, open this page from the laptop address printed in the terminal, same Wi-Fi. Export a PLY from 3D Scanner or Polycam. If GPS is blocked, type the pin from Maps.</p>
+        <p class="muted" id="hint">Export a PLY from 3D Scanner or Polycam, then upload it. The pin uses the coordinates above.</p>
+        <button type="button" class="primary" id="upload">Upload scan</button>
         <div class="actions">
           <button type="button" id="gps">Use this phone's GPS</button>
-          <button type="button" id="scan">Scan demo pothole</button>
-          <button type="button" id="upload">Upload PLY</button>
+          <button type="button" class="ghost" id="scan">Try a sample hole</button>
         </div>
         <div id="scan-result"></div>
         <div id="calc-wrap" hidden>
@@ -77,25 +77,28 @@
           <p style="font-size:13px;text-align:center;margin-top:8px">Powered by <a href="https://asphapro.com/pothole-repair-cost-calculator.html" rel="dofollow">Pothole Repair Cost Calculator – How Much Does It Cost to Fix a Pothole?</a> — <a href="https://asphapro.com" rel="dofollow">Asphapro.com</a></p>
         </div>
       </form>
-      <h3>Ranked queue</h3>
-      <div id="list"></div>
-      <h3>Crew coverage</h3>
-      <div id="cov" class="muted"></div>
-      <h3>Offline / delayed ingest</h3>
-      <div id="outbox" class="muted"></div>
-      <div id="hub"></div>
-    </aside>
+      <details>
+        <summary>Practice queue</summary>
+        <div class="kpi" id="kpis"></div>
+        <div id="list"></div>
+        <h3>Crew coverage</h3>
+        <div id="cov" class="muted"></div>
+        <p><button type="button" class="ghost" id="refresh">Re-run practice queue</button></p>
+      </details>
+    </div>
   </main>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script>
-    const map = L.map("map").setView([34.055, -118.246], 14);
-    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19 }).addTo(map);
-    let layer = L.layerGroup().addTo(map);
-    let cityLayer = L.layerGroup().addTo(map);
+    const map = window.L ? L.map("map").setView([34.055, -118.246], 14) : null;
+    if (map) {
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19 }).addTo(map);
+    }
+    let layer = map ? L.layerGroup().addTo(map) : null;
+    let cityLayer = map ? L.layerGroup().addTo(map) : null;
     const colors = { emergency: "#ff4d6d", high: "#ff7a59", medium: "#ffd166", low: "#70e000", monitor: "#4cc9f0" };
 
     function render(data) {
-      layer.clearLayers();
+      if (layer) layer.clearLayers();
       if (!data || !data.summary) {
         document.getElementById("kpis").innerHTML = "<div class='card'>Could not load run</div>";
         return;
@@ -114,9 +117,11 @@
       const ranked = [...data.events].sort((a,b) => b.priority_score - a.priority_score);
       ranked.forEach(e => {
         const loc = e.location;
-        L.circleMarker([loc.lat, loc.lon], {
-          radius: 9, color: colors[e.priority] || "#fff", fillOpacity: 0.85
-        }).bindPopup(`<b>${e.segment_id}</b><br>priority ${e.priority} (${e.priority_score.toFixed(0)})<br>integrity ${e.integrity_index?.toFixed(0)}/100<br>${e.claim || ""}<br>${e.recommended_action}`).addTo(layer);
+        if (map) {
+          L.circleMarker([loc.lat, loc.lon], {
+            radius: 9, color: colors[e.priority] || "#fff", fillOpacity: 0.85
+          }).bindPopup(`<b>${e.segment_id}</b><br>priority ${e.priority} (${e.priority_score.toFixed(0)})<br>${e.recommended_action}`).addTo(layer);
+        }
         const div = document.createElement("div");
         div.className = "row";
         div.innerHTML = `<span class="tag ${e.priority}">${e.priority}</span>
@@ -126,36 +131,15 @@
       });
     }
 
-    async function loadOutbox() {
-      const [o, h] = await Promise.all([
-        fetch("/api/outbox").then(r => r.json()).catch(() => ({pending: 0})),
-        fetch("/api/hub").then(r => r.json()).catch(() => ({records: []})),
-      ]);
-      document.getElementById("outbox").textContent =
-        `Device pending ${o.pending ?? 0} · delayed already synced ${o.delayed_synced ?? 0} · radio ${o.online_now ? "up" : "down"}`;
-      const hub = document.getElementById("hub");
-      hub.innerHTML = "";
-      (h.records || []).slice(0, 8).forEach(rec => {
-        const d = rec.hub || {};
-        const div = document.createElement("div");
-        div.className = "row";
-        div.innerHTML = `${d.delayed ? '<span class="tag delayed">delayed</span>' : '<span class="tag monitor">live</span>'}
-          ${rec.kind || rec.segment_id || rec.id || "record"}
-          <div class="muted">delay ${d.delay_s ?? "?"}s · captured ${d.captured_at ? new Date(d.captured_at*1000).toLocaleTimeString() : ""}</div>`;
-        hub.appendChild(div);
-      });
-    }
-
     async function load(refresh=false) {
       try {
         const r = await fetch("/api/run" + (refresh ? "?refresh=true" : ""));
         if (!r.ok) throw new Error("run " + r.status);
         render(await r.json());
       } catch (err) {
-        document.getElementById("kpis").innerHTML = "<div class='card'>API error</div>";
+        document.getElementById("kpis").innerHTML = "<div class='card'>Practice queue unavailable</div>";
         console.error(err);
       }
-      loadOutbox();
       loadCity();
     }
     function demoCloud() {
@@ -182,37 +166,25 @@
           <div class="card"><span class="muted">LiDAR</span><b>${c.length_ft}×${c.width_ft} ft</b><span class="muted">${c.depth_in} in deep</span></div>
           <div class="card"><span class="muted">Base (calculator)</span><b>${money(c.base_usd)}</b></div>
           <div class="card"><span class="muted">With LA factors</span><b>${money(c.adjusted_usd)}</b><span class="muted">+${Math.round((c.uplift || 0) * 100)}%</span></div>
-          <div class="card"><span class="muted">Scan trust</span><b>${Math.round(body.scan_trust || 0)}</b><span class="muted">pose ${Math.round(body.pose_quality || 0)}</span></div>
+          <div class="card"><span class="muted">Points</span><b>${body.lidar?.point_count ?? "—"}</b><span class="muted">${body.map?.contributors || 1} scanner(s)</span></div>
         </div>
         <div class="muted">${factors || "No live factors"}</div>
         <div class="muted">${c.note || ""}</div>`;
       document.getElementById("calc-wrap").hidden = false;
+      const lat = Number(document.getElementById("lat").value);
+      const lon = Number(document.getElementById("lon").value);
+      if (map && Number.isFinite(lat) && Number.isFinite(lon)) map.setView([lat, lon], 17);
       loadCity();
+      document.getElementById("scan-result").scrollIntoView({ behavior: "smooth", block: "nearest" });
     }
 
-    async function phonePose() {
-      const pose = { pitch: 0, roll: 0, heading_deg: Number(document.getElementById("heading")?.value || 0) };
-      try {
-        if (typeof DeviceOrientationEvent !== "undefined" && typeof DeviceOrientationEvent.requestPermission === "function") {
-          await DeviceOrientationEvent.requestPermission();
-        }
-      } catch (err) { /* desktop or denied */ }
-      const ev = await new Promise(resolve => {
-        const timer = setTimeout(() => resolve(null), 600);
-        window.addEventListener("deviceorientation", event => {
-          clearTimeout(timer);
-          resolve(event);
-        }, { once: true });
-      });
-      if (!ev) return pose;
-      const beta = Number(ev.beta || 0);
-      const gamma = Number(ev.gamma || 0);
-      pose.pitch = beta * Math.PI / 180;
-      pose.roll = gamma * Math.PI / 180;
-      if (ev.webkitCompassHeading != null && Number.isFinite(Number(ev.webkitCompassHeading))) {
-        pose.heading_deg = Number(ev.webkitCompassHeading);
-      }
-      return pose;
+    function scanBody(extra) {
+      return {
+        contributor_id: document.getElementById("who").value || "walker",
+        lat: Number(document.getElementById("lat").value),
+        lon: Number(document.getElementById("lon").value),
+        ...extra,
+      };
     }
 
     document.getElementById("gps").onclick = () => {
@@ -233,22 +205,11 @@
       const btn = document.getElementById("scan");
       btn.disabled = true;
       document.getElementById("scan-result").textContent = "Scanning…";
-      const posePromise = phonePose();
       try {
-        const pose = await posePromise;
         const r = await fetch("/api/scene", {
           method: "POST",
           headers: {"Content-Type": "application/json"},
-          body: JSON.stringify({
-            contributor_id: document.getElementById("who").value || "walker",
-            lat: Number(document.getElementById("lat").value),
-            lon: Number(document.getElementById("lon").value),
-            heading_deg: pose.heading_deg,
-            pitch: pose.pitch,
-            roll: pose.roll,
-            xyz: demoCloud(),
-            notes: "lidar pothole",
-          }),
+          body: JSON.stringify(scanBody({ xyz: demoCloud(), notes: "sample hole" })),
         });
         if (!r.ok) {
           const err = await r.json().catch(() => ({}));
@@ -271,7 +232,6 @@
       const btn = document.getElementById("upload");
       btn.disabled = true;
       document.getElementById("scan-result").textContent = "Reading LiDAR…";
-      const posePromise = phonePose();
       try {
         const dataUrl = await new Promise((resolve, reject) => {
           const reader = new FileReader();
@@ -279,21 +239,11 @@
           reader.onerror = () => reject(reader.error);
           reader.readAsDataURL(file);
         });
-        const pose = await posePromise;
         const encoded = String(dataUrl).split(",")[1] || "";
         const r = await fetch("/api/scene", {
           method: "POST",
           headers: {"Content-Type": "application/json"},
-          body: JSON.stringify({
-            contributor_id: document.getElementById("who").value || "walker",
-            lat: Number(document.getElementById("lat").value),
-            lon: Number(document.getElementById("lon").value),
-            heading_deg: pose.heading_deg,
-            pitch: pose.pitch,
-            roll: pose.roll,
-            ply_b64: encoded,
-            notes: "iphone ply",
-          }),
+          body: JSON.stringify(scanBody({ ply_b64: encoded, notes: "iphone ply" })),
         });
         if (!r.ok) {
           const err = await r.json().catch(() => ({}));
@@ -308,23 +258,28 @@
     }
 
     async function loadCity() {
+      if (!cityLayer) return;
       cityLayer.clearLayers();
       const data = await fetch("/api/city").then(r => r.json()).catch(() => ({defects: []}));
+      const pts = [];
       (data.defects || []).forEach(d => {
         const cost = d.cost || {};
-        L.circleMarker([d.lat, d.lon], { radius: 7, color: "#c4b5fd", fillOpacity: 0.9 })
+        pts.push([d.lat, d.lon]);
+        L.circleMarker([d.lat, d.lon], { radius: 8, color: "#c4b5fd", fillOpacity: 0.9 })
           .bindPopup(`<b>${d.scene_id || "scan"}</b><br>${d.depth_mm} mm · ${d.contributor_id}<br>base ${money(cost.base_usd)} · adjusted ${money(cost.adjusted_usd)}`)
           .addTo(cityLayer);
       });
+      if (pts.length === 1) map.setView(pts[0], 17);
+      else if (pts.length > 1) map.fitBounds(pts, { padding: [24, 24] });
     }
 
+    if (!window.isSecureContext) {
+      document.getElementById("gps").hidden = true;
+      document.getElementById("hint").textContent = "GPS needs the Replit HTTPS page. On this address, type the pin from Maps, then upload the PLY.";
+    }
     document.getElementById("scan").onclick = scanDemo;
     document.getElementById("upload").onclick = uploadPly;
     document.getElementById("refresh").onclick = () => load(true);
-    document.getElementById("sync").onclick = async () => {
-      await fetch("/api/sync-now", {method: "POST"});
-      loadOutbox();
-    };
     load();
   </script>
 </body>

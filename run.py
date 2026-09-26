@@ -31,6 +31,7 @@ def main() -> None:
         import pytest
 
         raise SystemExit(pytest.main(["tests", "-q"]))
+    port = int(os.environ.get("PORT", args.port))
     import socket
     import uvicorn
 
@@ -45,9 +46,10 @@ def main() -> None:
             return "this-pc"
 
     lan = _lan_ip()
-    print(f"On this PC:  http://127.0.0.1:{args.port}", flush=True)
-    print(f"On the iPhone (same Wi-Fi):  http://{lan}:{args.port}", flush=True)
-    uvicorn.run("dashboard.app:app", host="0.0.0.0", port=args.port, reload=False)
+    print(f"On this PC:  http://127.0.0.1:{port}", flush=True)
+    print(f"On the iPhone (same Wi-Fi):  http://{lan}:{port}", flush=True)
+    print("On Replit, open the HTTPS webview. That is the address that can use the phone GPS.", flush=True)
+    uvicorn.run("dashboard.app:app", host="0.0.0.0", port=port, reload=False)
 
 
 if __name__ == "__main__":

@@ -22,6 +22,9 @@ from infra_pulse.models import (
 )
 from infra_pulse.thermal import thermal_analyze
 from infra_pulse.vision import Yolo11Detector
+from infra_pulse.iphone import IPhoneScan, pose_quality
+from infra_pulse.llm_detect import apply_llm, labels_boost
+from infra_pulse.scene_store import ingest_scan
 
 
 @dataclass
@@ -55,12 +58,18 @@ class InfraPulsePipeline:
         vision: Optional[VisionResult] = None,
         lidar: Optional[LidarResult] = None,
         thermal: Optional[ThermalResult] = None,
+        notes: str = "",
+        pose_quality_score: float = 50,
+        scene_id: Optional[str] = None,
+        contributor_count: int = 1,
     ) -> FusedEvent:
         if vision is None:
             if image is None:
                 vision = VisionResult()
             else:
                 vision = self.detector.detect(image)
+        lidar_depth = float(lidar.depth_mm) if lidar is not None else 0.0
+        vision = apply_llm(vision, notes=notes, lidar_mm=lidar_depth)
         imu = imu_analyze(accel_xyz if accel_xyz is not None else np.zeros((16, 3)))
         prev_rms = self.memory.rms.get(segment_id)
         prev_low = self.memory.low_band.get(segment_id)
@@ -84,6 +93,10 @@ class InfraPulsePipeline:
             image_path=str(image) if isinstance(image, (str, Path)) else None,
             baseline_rms_g=prev_rms,
             baseline_low_band=prev_low,
+            pose_quality=pose_quality_score,
+            la_boost=labels_boost(vision),
+            scene_id=scene_id or (lidar.scene_id if lidar else None),
+            contributor_count=contributor_count if lidar is None else max(contributor_count, lidar.contributors),
         )
         return fuse(obs)
 
@@ -98,6 +111,31 @@ class InfraPulsePipeline:
         route = greedy_route(orders, self.depot)
         cov = crew_coverage(orders, n_crews)
         return PipelineResult(events=events, orders=orders, route=route, coverage=cov)
+
+    def ingest_iphone(self, scan: IPhoneScan, xyz: np.ndarray, notes: str = "", root=None) -> FusedEvent:
+        lidar = ingest_scan(
+            scan.location,
+            xyz,
+            scan.contributor_id,
+            extra={"device": scan.device},
+            root=root,
+            motion=scan.motion,
+        )
+        pq = pose_quality(scan.motion)
+        vision = None
+        if scan.image_path:
+            vision = self.detector.detect(scan.image_path)
+        return self.observe_segment(
+            segment_id=lidar.scene_id or scan.contributor_id,
+            location=scan.location,
+            accel_xyz=np.asarray(scan.motion.accel_xyz, dtype=float) if scan.motion.accel_xyz else None,
+            vision=vision,
+            lidar=lidar,
+            notes=notes,
+            pose_quality_score=pq,
+            scene_id=lidar.scene_id,
+            contributor_count=lidar.contributors,
+        )
 
     def disaster_queue(
         self, events: list[FusedEvent], epicenter: tuple[float, float], radius_km: float = 15.0

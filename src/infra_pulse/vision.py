@@ -143,16 +143,28 @@ def _vision_severity(boxes: list[BoundingBox]) -> float:
         return 0.0
     weight = {
         DistressClass.POTHOLE: 1.0,
+        DistressClass.ALLIGATOR_CRACK: 0.85,
+        DistressClass.RUTTING: 0.8,
+        DistressClass.SHOVING: 0.75,
+        DistressClass.UTILITY_SETTLEMENT: 0.75,
+        DistressClass.SPALLING: 0.7,
+        DistressClass.ROOT_UPLIFT: 0.65,
+        DistressClass.JOINT_FAULT: 0.65,
+        DistressClass.PONDING: 0.55,
         DistressClass.CRACK: 0.55,
+        DistressClass.EDGE_CRACK: 0.5,
         DistressClass.RAVELING: 0.45,
         DistressClass.PATCH: 0.35,
         DistressClass.OTHER_DISTRESS: 0.4,
     }
     score = 0.0
     for b in boxes:
-        score += 100.0 * b.area_ratio * 10.0 * weight[b.label] * b.confidence
+        w = weight.get(b.label, 0.4)
+        score += 100.0 * b.area_ratio * 10.0 * w * b.confidence
         if b.label == DistressClass.POTHOLE:
             score += 40 * b.confidence
+        elif b.label in (DistressClass.ALLIGATOR_CRACK, DistressClass.RUTTING):
+            score += 30 * b.confidence
         elif b.label == DistressClass.CRACK:
             score += 22 * b.confidence
         else:

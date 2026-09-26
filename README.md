@@ -1,117 +1,79 @@
 # InfraPulse
 
-Turn vehicles that already drive the network into **autonomous pavement inspectors**: detect distress, corroborate it with motion/geometry, score **inspection priority**, and emit a ranked recovery queue.
+iPhone Pro / Pro Max **LiDAR + Core Motion** screening for pavement and nearby street structure. An **LLM** (few-shot trained on **Los Angeles** distress) classifies issues; fusion puts extra weight on alligator cracking, rutting, utility settlement, root uplift, shoving, and heat/UV raveling. Multiple people scanning the same GPS cell **merge ASCII PLY** files into a denser deterioration map.
 
-This is a **screening system**. Outputs are condition / priority scores, not a statement that a bridge or road is structurally safe.
+This is a **screening system**. It is not a structural capacity rating.
 
-Prompt D fit: everyday inspection on municipal and fleet vehicles; the same events re-rank after a wildfire, flood, or quake.
-
-## How the pieces click together
+## How it works
 
 ```
- Camera (Pi or phone)     MPU6050 IMU          GPS              optional thermal / LiDAR
-         │                     │                │                         │
-         │              |az| spike? ─────────► snapshot                   │
-         ▼                     ▼                ▼                         ▼
-      YOLO11              roughness           lat/lon              depth / ΔT
-   crack/pothole           IRI proxy            │                         │
-         └─────────────────────┴────────────────┴─────────────────────────┘
-                                   FUSION ENGINE
-                    severity × confidence × criticality × traffic
-                    + deterioration (repeat visits)
+iPhone Pro Max
+  LiDAR mesh (PLY)   camera   gyro / accel   magnetometer   GPS   barometer   ARKit
+         │              │            │              │         │        │         │
+         │              ▼            ▼              │         │        │         │
+         │         LLM + LA taxonomy          pose quality    scene ID  Z hint  trust
+         │         (YOLO optional)            (reject whip)      │        │
+         ▼                                                      ▼        ▼
+   contrib_*.ply  ──voxel merge (min Z)──►  merged.ply + scene.ipulse.json
+                                   FUSION
+              LiDAR geometry × LA prior × Core Motion × repeat visits
                                    │
                     work order + greedy crew route
-                    disaster mode: rank inside blast radius
 ```
 
-YOLO11 is the **vision specialist**. It is not an LLM. An LLM only explains fused events or reviews *uncertain* crops.
+Hardware kits (Pi, MPU-6050, Pi camera) are **out of scope**. Capture is the phone you already have.
 
-## Integrity layers (what “structural” can mean here)
+## LA-weighted LLM training
 
-| Layer | Sensor | Honest claim |
-|---|---|---|
-| Surface | YOLO11 + camera | Cracks, potholes, patches |
-| Geometry | LiDAR / depth | Rut, hole depth, settlement |
-| Dynamics | IMU spectrum | Vibration signature vs last drive |
-| History | Repeat GPS visits | Getting worse, not a one-off |
-| Internal | GPR / UPV / geophones | **Not on the van this weekend** |
+Taxonomy and few-shots live in `src/infra_pulse/la_priors.py`. Offline, notes like “alligator … wheel path” remap generic `crack` to `alligator_crack`. With `INFRA_PULSE_LLM_URL` set, the same system prompt is sent to an OpenAI-compatible chat endpoint.
 
-`integrity_index` is `100 −` those distress layers. High is healthier. It is still a screen.
+```powershell
+python scripts/prepare_llm_training.py
+```
 
-## Models — what to use where
+Writes `datasets/la_distress.jsonl` and `datasets/la_system_prompt.txt` for fine-tune or RAG.
 
-| Job | Use | Do not |
-|---|---|---|
-| Find defects | **YOLO11** (seg if you have masks) | ChatGPT on every frame |
-| Unsure crop (conf 0.35–0.72) | GPT-4o, Claude Sonnet, or Gemini 2.5 Pro vision | Send the whole video |
-| Work-order wording | GPT-4o-mini / Claude via `INFRA_PULSE_LLM_URL` | Let the LLM change the score |
-| Fine-tune later | YOLO11n → YOLO11s on RDD/your photos | Train a giant net in 3 days |
-| Point clouds | Open3D on the laptop | Run Open3D on a Pi Zero |
+## Collaborative LiDAR
 
-## Hardware (short)
+Each scan is stored as ASCII **PLY** (3D Scanner App, Polycam, or ARKit export). Same ~20 m GPS cell → same `data/scenes/<scene_id>/` folder. Voxel merge keeps the **lowest Z** so holes and ruts survive as coverage grows. Gyro / pitch / roll / compass heading rotate each cloud into the first contributor’s frame; barometer only supplies a clipped height hint (overpasses), not millimetre depth.
 
-Weekend: phone + MPU-6050 + GPS. Next dollars: cleaner IMU (ICM-42688, 200 Hz+), then RealSense/iPhone LiDAR, then RTK GNSS. Bridges: sensors *on the structure*. Never treat HC-SR04 as NDT.
+File layout:
 
-## 3-day build order
+```
+data/scenes/la_<lat>_<lon>/
+  scene.ipulse.json
+  merged.ply
+  contrib_<id>_<ts>.ply
+```
 
-1. **Day 1 — sensing.** Pi Zero 2 W + MPU6050 + camera or phone. Prove IMU trigger + GPS stamp. Skip GPR/ultrasound.
-2. **Day 2 — detectors.** YOLO11 on images (custom pavement weights if you have a dataset; classical OpenCV fills gaps). IMU roughness. Optional thermal/LiDAR.
-3. **Day 3 — wow.** Fusion + map + work orders + “3 crews cover X% of high risk.” Drive a healthy stretch vs a fake pothole.
-
-## Run the demo (laptop, no hardware)
+## Run
 
 ```powershell
 cd C:\Users\admin\infra-pulse
 .\.venv\Scripts\Activate.ps1
 python run.py demo
-python run.py offline
 python run.py test
 python run.py serve
+python scripts/prepare_llm_training.py
 ```
 
-Open http://127.0.0.1:8000  (`run.py` puts `src` on the path so you do not need PYTHONPATH).
+Open http://127.0.0.1:8000
 
-Fine-tune YOLO11 later:
+POST two walks of the same block: `POST /api/scene` with `contributor_id`, `lat`, `lon`, `heading_deg`, and `xyz` points.
 
-```powershell
-python scripts/prepare_yolo_dataset.py
-yolo detect train data=datasets/pavement.yaml model=yolo11n.pt epochs=50 imgsz=640
-```
+Capture checklist: `hardware/PARTS.md`. Field tests: `docs/TESTING_PLAN.md`.
 
-Then point `InfraPulsePipeline(yolo_weights="runs/detect/train/weights/best.pt")`.
-
-Shopping list with qty/price: `hardware/PARTS.md`.  
-Day-by-day tests (Fri–Sun): `docs/TESTING_PLAN.md`.  
-Offline logging + delayed sync: `src/infra_pulse/offline.py` (scan never waits on cell service).
-
-## Offline / delayed sync
-
-The van keeps scanning in a tunnel or rural dead zone. IMU/GPS/images append locally. An SQLite **outbox** holds heartbeats and impact events as `pending`. When LTE/Wi-Fi returns, a background loop (or **Flush delayed outbox** on the dashboard) POSTs them to the hub. Records captured while radio-down, or sitting more than 20 s, are tagged **delayed**.
-
-```powershell
-$env:PYTHONPATH="src"
-python scripts/demo_offline.py
-python -m uvicorn dashboard.app:app --reload --app-dir .
-# logger on the Pi:
-python hardware/pi_collector.py --hub http://<laptop-ip>:8000
-```
-
-Force a dead zone: `$env:INFRA_PULSE_FORCE_OFFLINE="1"`
-
-## Product positioning (from your canvas)
+## Product positioning
 
 | Block | InfraPulse |
 |---|---|
-| Problem | Inspection is manual and reactive; failure is expensive; disasters multiply the queue |
-| Solution | Camera + IMU + GPS on vehicles already moving; YOLO11 + fusion; auto-priority heat map |
-| Value | Only keep the data you need (IMU-triggered frames); deterioration over repeat passes |
-| Unfair advantage | Cheap rear-mount distribution on waste/bus/city fleets vs dedicated inspection trucks |
-| Segments | Public works, city fleets, transit, utilities, insurers, inspection consultants |
-| Alternatives | Blyncsy (crowdsourced / mostly stationary + LLM), FHWA camera+laser programs, manual drones |
-| Revenue | $/mile, per-vehicle subscription, or data access for cities / insurers / owners |
-
-Phone-app alternative: same algorithm, sensors already in the pocket. Hard part is getting drivers to leave it on — fleets beat consumers for the competition story.
+| Problem | Inspection is manual; LA streets fail from heat, traffic, utilities, and trees more than freeze-thaw |
+| Solution | Crowd LiDAR on iPhone Pro + LLM with LA priors + fusion queue |
+| Value | Same place scanned by many people becomes a fuller 3D record |
+| Unfair advantage | No custom van; Pro Max LiDAR is already in inspectors’ pockets |
+| Segments | Public works, 311 follow-up, fleets, utilities |
+| Alternatives | Dedicated inspection trucks, photo-only 311, Blyncsy-style reports |
 
 ## What we are not claiming
 
-Surface RGB + IMU cannot see rebar, voids, or remaining structural life. NDT (ultrasound, GPR) is a later layer: *vision sees the surface, LiDAR sees movement, NDT sees what the surface cannot.*
+Phone LiDAR + RGB cannot see rebar, voids, or remaining structural life. NDT stays a later handoff.

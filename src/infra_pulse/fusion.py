@@ -5,6 +5,7 @@ import numpy as np
 from infra_pulse.config import IMU_FUSION_PEAK_G, FusionWeights, PRIORITY_THRESHOLDS
 from infra_pulse.explainer import explain
 from infra_pulse.integrity import classify_claim, integrity_index, layer_scores, vision_needs_second_pass
+from infra_pulse.la_priors import la_boost
 from infra_pulse.models import (
     DistressClass,
     FusedEvent,
@@ -63,7 +64,9 @@ def fuse(obs: SegmentObservation, weights: FusionWeights | None = None) -> Fused
     weights = weights or FusionWeights()
     labels = [d.label for d in obs.vision.detections]
     det = deterioration_index(obs)
+    la = obs.la_boost if obs.la_boost else la_boost(labels)
     layers = layer_scores(obs, det)
+    layers["la_prior"] = la
     idx = integrity_index(layers)
     second_pass = vision_needs_second_pass(obs.vision)
 
@@ -86,6 +89,7 @@ def fuse(obs: SegmentObservation, weights: FusionWeights | None = None) -> Fused
         + weights.imu * obs.imu.severity
         + weights.thermal * obs.thermal.severity
         + weights.deterioration * det
+        + weights.la_prior * la
     )
     agreement_boost = 1.0 + 0.12 * max(0, len(agreeing) - 1)
     confidence = float(
@@ -119,6 +123,12 @@ def fuse(obs: SegmentObservation, weights: FusionWeights | None = None) -> Fused
         rms_delta = 100.0 * (obs.imu.rms_vertical_g - obs.baseline_rms_g) / obs.baseline_rms_g
         if rms_delta >= 25:
             priority_score = min(100.0, priority_score + 8)
+    if obs.lidar.contributors >= 2:
+        if "crowd_lidar" not in agreeing:
+            agreeing.append("crowd_lidar")
+        priority_score = min(100.0, priority_score + 4)
+    if obs.pose_quality < 35:
+        confidence = float(np.clip(confidence * 0.85, 0, 1))
     claim = classify_claim(obs, layers, agreeing)
     level = _level(priority_score)
     itype = _inspection(obs, labels, len(agreeing), claim, second_pass)
@@ -141,6 +151,10 @@ def fuse(obs: SegmentObservation, weights: FusionWeights | None = None) -> Fused
         claim=claim,
         needs_second_pass=second_pass,
         rms_delta_pct=float(rms_delta),
+        la_boost=la,
+        scene_id=obs.scene_id or obs.lidar.scene_id,
+        contributor_count=obs.contributor_count or obs.lidar.contributors,
+        pose_quality=obs.pose_quality,
     )
     event.explanation = _explain(obs, labels, agreeing, det, confidence, event)
     event.explanation = explain(event)
@@ -151,10 +165,9 @@ def _explain(obs, labels, agreeing, det, confidence, event) -> str:
     label_txt = ", ".join(sorted({x.value for x in labels})) or "no visual class"
     parts = [
         f"Vision={obs.vision.severity:.0f} ({label_txt}, {obs.vision.source}, conf={obs.vision.confidence:.2f}).",
-        f"Geometry depth={obs.lidar.depth_mm:.0f} mm, rut={obs.lidar.rut_mm:.0f} mm.",
-        f"IMU peak={obs.imu.peak_vertical_g:.2f} g (z={obs.imu.z_score:.1f}, modal={obs.imu.modal_score:.0f}, f0={obs.imu.dominant_hz:.1f} Hz).",
-        f"Thermal ΔT={obs.thermal.delta_c:.1f}°C.",
-        f"Sensors agreeing: {', '.join(agreeing) or 'none'}.",
+        f"iPhone LiDAR depth={obs.lidar.depth_mm:.0f} mm, rut={obs.lidar.rut_mm:.0f} mm, pts={obs.lidar.point_count}, scanners={obs.lidar.contributors}.",
+        f"Core Motion peak={obs.imu.peak_vertical_g:.2f} g (pose={obs.pose_quality:.0f}, modal={obs.imu.modal_score:.0f}).",
+        f"LA prior boost={event.la_boost:.0f}. Sensors agreeing: {', '.join(agreeing) or 'none'}.",
         f"Repeat flags={obs.prior_flags}, deterioration index={det:.0f}, RMS Δ={event.rms_delta_pct:.0f}%.",
         f"Fusion confidence={confidence:.2f}. Screening only — not a structural capacity rating.",
     ]
@@ -165,7 +178,7 @@ def _action(level: PriorityLevel, itype: InspectionType, claim: IntegrityClaim) 
     if claim == IntegrityClaim.POSSIBLE_INTERNAL:
         return "No surface box explains the vibration shift — schedule NDT / structure-mounted sensors, do not certify from the dashcam."
     if itype == InspectionType.VISION_LLM:
-        return "YOLO is uncertain; run a vision-LLM second pass on the crop, then a human if still ambiguous."
+        return "YOLO/LLM is uncertain; run a vision-LLM second pass on the crop, then a human if still ambiguous."
     if level == PriorityLevel.EMERGENCY:
         return "Escalate immediately; restrict lane if needed and dispatch engineer."
     if level == PriorityLevel.HIGH:

@@ -1,9 +1,68 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 import numpy as np
 
 from infra_pulse.config import LIDAR_POTHOLE_MM, LIDAR_RUT_MM
 from infra_pulse.models import LidarResult
+
+
+def read_ply(path: Path) -> np.ndarray:
+    """ASCII PLY vertex xyz (iPhone 3D Scanner / Polycam / ARKit export)."""
+    if not path.exists():
+        return np.zeros((0, 3))
+    lines = path.read_text(encoding="utf-8", errors="ignore").splitlines()
+    n = 0
+    header_end = 0
+    for i, line in enumerate(lines):
+        if line.startswith("element vertex"):
+            n = int(line.split()[-1])
+        if line.strip() == "end_header":
+            header_end = i + 1
+            break
+    pts = []
+    for line in lines[header_end : header_end + n]:
+        parts = line.split()
+        if len(parts) >= 3:
+            pts.append([float(parts[0]), float(parts[1]), float(parts[2])])
+    return np.asarray(pts, dtype=float) if pts else np.zeros((0, 3))
+
+
+def write_ply(path: Path, xyz: np.ndarray) -> None:
+    pts = np.asarray(xyz, dtype=float)
+    if pts.ndim != 2 or pts.shape[-1] < 3:
+        pts = np.zeros((0, 3))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    body = "\n".join(f"{p[0]:.5f} {p[1]:.5f} {p[2]:.5f}" for p in pts)
+    path.write_text(
+        f"ply\nformat ascii 1.0\nelement vertex {len(pts)}\n"
+        f"property float x\nproperty float y\nproperty float z\nend_header\n{body}\n",
+        encoding="utf-8",
+    )
+
+
+def voxel_merge(a: np.ndarray, b: np.ndarray, voxel_m: float = 0.02) -> np.ndarray:
+    """Keep the lowest Z in each 2 cm cell so holes survive as people add scans."""
+    stacked = []
+    for arr in (a, b):
+        pts = np.asarray(arr, dtype=float)
+        if pts.ndim == 2 and pts.shape[-1] >= 3 and len(pts):
+            stacked.append(pts[:, :3])
+    if not stacked:
+        return np.zeros((0, 3))
+    pts = np.vstack(stacked)
+    pts = pts[np.isfinite(pts).all(axis=1)]
+    if len(pts) == 0:
+        return pts
+    keys = np.round(pts[:, :2] / voxel_m).astype(np.int64)
+    buckets: dict[tuple[int, int], np.ndarray] = {}
+    for p, k in zip(pts, keys):
+        xy = (int(k[0]), int(k[1]))
+        prev = buckets.get(xy)
+        if prev is None or p[2] < prev[2]:
+            buckets[xy] = p
+    return np.vstack(list(buckets.values())) if buckets else np.zeros((0, 3))
 
 
 def _fit_plane(xyz: np.ndarray) -> tuple[np.ndarray, float]:
@@ -63,4 +122,10 @@ def lidar_analyze(xyz: np.ndarray) -> LidarResult:
         sev = min(80.0, 25 + (rut_mm - LIDAR_RUT_MM) * 1.5)
     else:
         sev = min(40.0, depth_mm * 1.1)
-    return LidarResult(depth_mm=depth_mm, rut_mm=rut_mm, volume_m3=volume, severity=sev)
+    return LidarResult(
+        depth_mm=depth_mm,
+        rut_mm=rut_mm,
+        volume_m3=volume,
+        severity=sev,
+        point_count=int(len(pts)),
+    )

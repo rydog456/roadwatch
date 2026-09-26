@@ -67,15 +67,15 @@ def _vision(label: DistressClass | None, conf: float, area: float) -> VisionResu
 START = (34.0522, -118.2437)
 
 SEGMENTS = [
-    dict(name="healthy", peak=0.2, hole=2, tdelta=0.4, crit=40, traf=45, weather=0, flags=0, days=0, label=None, conf=0.0, area=0.0),
-    dict(name="crack", peak=0.4, hole=8, tdelta=1.1, crit=55, traf=60, weather=10, flags=1, days=20, label=DistressClass.CRACK, conf=0.62, area=0.03),
-    dict(name="pothole", peak=2.4, hole=42, tdelta=3.4, crit=80, traf=90, weather=5, flags=3, days=45, label=DistressClass.POTHOLE, conf=0.91, area=0.06),
-    dict(name="rut", peak=0.9, hole=18, tdelta=1.6, crit=70, traf=75, weather=20, flags=2, days=30, label=DistressClass.OTHER_DISTRESS, conf=0.55, area=0.02),
-    dict(name="hospital_access", peak=1.6, hole=31, tdelta=2.2, crit=95, traf=88, weather=15, flags=4, days=60, label=DistressClass.POTHOLE, conf=0.84, area=0.05),
-    dict(name="after_storm", peak=0.7, hole=12, tdelta=4.1, crit=50, traf=40, weather=80, flags=2, days=10, label=DistressClass.CRACK, conf=0.70, area=0.04),
-    dict(name="quiet_street", peak=0.3, hole=28, tdelta=0.9, crit=25, traf=15, weather=0, flags=0, days=0, label=DistressClass.POTHOLE, conf=0.78, area=0.04),
-    dict(name="cleared", peak=0.15, hole=3, tdelta=0.5, crit=60, traf=70, weather=0, flags=0, days=0, label=None, conf=0.0, area=0.0),
-    dict(name="bridge_span", peak=0.0, hole=4, tdelta=0.5, crit=92, traf=70, weather=5, flags=1, days=14, label=None, conf=0.0, area=0.0, kind="modal"),
+    dict(name="healthy", peak=0.2, hole=2, tdelta=0.4, crit=40, traf=45, weather=0, flags=0, days=0, label=None, conf=0.0, area=0.0, notes=""),
+    dict(name="alligator_wilshire", peak=0.4, hole=8, tdelta=1.1, crit=55, traf=60, weather=10, flags=1, days=20, label=DistressClass.CRACK, conf=0.62, area=0.03, notes="alligator fatigue cracks in the wheel path, July heat, Wilshire"),
+    dict(name="pothole", peak=2.4, hole=42, tdelta=3.4, crit=80, traf=90, weather=5, flags=3, days=45, label=DistressClass.POTHOLE, conf=0.91, area=0.06, notes="utility trench pothole after first rain"),
+    dict(name="rut_110", peak=0.9, hole=18, tdelta=1.6, crit=70, traf=75, weather=20, flags=2, days=30, label=DistressClass.RUTTING, conf=0.55, area=0.02, notes="wheel-path rut on the 110"),
+    dict(name="hospital_access", peak=1.6, hole=31, tdelta=2.2, crit=95, traf=88, weather=15, flags=4, days=60, label=DistressClass.POTHOLE, conf=0.84, area=0.05, notes=""),
+    dict(name="after_storm", peak=0.7, hole=12, tdelta=4.1, crit=50, traf=40, weather=80, flags=2, days=10, label=DistressClass.PONDING, conf=0.70, area=0.04, notes="ponding at a blocked catch basin"),
+    dict(name="quiet_street", peak=0.3, hole=28, tdelta=0.9, crit=25, traf=15, weather=0, flags=0, days=0, label=DistressClass.POTHOLE, conf=0.78, area=0.04, notes=""),
+    dict(name="cleared", peak=0.15, hole=3, tdelta=0.5, crit=60, traf=70, weather=0, flags=0, days=0, label=None, conf=0.0, area=0.0, notes=""),
+    dict(name="bridge_span", peak=0.0, hole=4, tdelta=0.5, crit=92, traf=70, weather=5, flags=1, days=14, label=None, conf=0.0, area=0.0, kind="modal", notes=""),
 ]
 
 
@@ -98,6 +98,7 @@ def demo_observations() -> list[dict]:
                 prior_flags=int(s["flags"]),
                 days_since_first_flag=int(s["days"]),
                 vision=_vision(s["label"], s["conf"], s["area"]),
+                notes=s.get("notes", ""),
             )
         )
     return segs

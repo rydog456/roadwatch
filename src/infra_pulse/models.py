@@ -8,10 +8,19 @@ from pydantic import BaseModel, Field
 
 class DistressClass(str, Enum):
     CRACK = "crack"
+    ALLIGATOR_CRACK = "alligator_crack"
     POTHOLE = "pothole"
-    OTHER_DISTRESS = "other_distress"
-    PATCH = "patch"
+    RUTTING = "rutting"
     RAVELING = "raveling"
+    PATCH = "patch"
+    SHOVING = "shoving"
+    EDGE_CRACK = "edge_crack"
+    ROOT_UPLIFT = "root_uplift"
+    UTILITY_SETTLEMENT = "utility_settlement"
+    JOINT_FAULT = "joint_fault"
+    SPALLING = "spalling"
+    PONDING = "ponding"
+    OTHER_DISTRESS = "other_distress"
 
 
 class PriorityLevel(str, Enum):
@@ -84,6 +93,9 @@ class LidarResult(BaseModel):
     rut_mm: float
     volume_m3: float
     severity: float = Field(ge=0, le=100)
+    point_count: int = 0
+    contributors: int = 1
+    scene_id: Optional[str] = None
 
 
 class GeoPoint(BaseModel):
@@ -109,6 +121,10 @@ class SegmentObservation(BaseModel):
     image_path: Optional[str] = None
     baseline_rms_g: Optional[float] = None
     baseline_low_band: Optional[float] = None
+    pose_quality: float = Field(default=50, ge=0, le=100)
+    la_boost: float = Field(default=0, ge=0, le=100)
+    scene_id: Optional[str] = None
+    contributor_count: int = 1
 
 
 class FusedEvent(BaseModel):
@@ -130,6 +146,10 @@ class FusedEvent(BaseModel):
     claim: IntegrityClaim = IntegrityClaim.HEALTHY_SCREEN
     needs_second_pass: bool = False
     rms_delta_pct: float = 0.0
+    la_boost: float = 0.0
+    scene_id: Optional[str] = None
+    contributor_count: int = 1
+    pose_quality: float = 50.0
 
 
 class WorkOrder(BaseModel):

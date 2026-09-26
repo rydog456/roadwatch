@@ -7,6 +7,7 @@ data/*.json
 data/*.sqlite
 data/*.sqlite-wal
 data/*.sqlite-shm
+data/scenes/
 .pytest_cache/
 runs/
 datasets/pavement/images/

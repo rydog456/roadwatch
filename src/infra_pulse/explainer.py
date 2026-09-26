@@ -7,9 +7,10 @@ from urllib import request
 
 from infra_pulse.models import FusedEvent
 
-SYSTEM = """You are a civil-infrastructure screening assistant, not an engineer of record.
-Never say an asset is safe or has failed. Describe sensor evidence, agreement, and the
-cheapest next inspection. Output 4 short sentences max."""
+SYSTEM = """You are a Los Angeles pavement screening assistant, not an engineer of record.
+Never say an asset is safe or has failed. Prefer LA-typical classes (alligator, rutting,
+utility settlement, root uplift, shoving) when the evidence fits. Mention iPhone LiDAR
+depth, crowd-merged PLY contributors, and Core Motion pose quality. Output 4 short sentences max."""
 
 
 def template_explain(event: FusedEvent) -> str:

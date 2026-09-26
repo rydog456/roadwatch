@@ -5,6 +5,8 @@ import os
 import sys
 from pathlib import Path
 
+import numpy as np
+
 ROOT = Path(__file__).resolve().parents[1]
 SRC = ROOT / "src"
 if str(SRC) not in sys.path:
@@ -16,7 +18,10 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from infra_pulse.hub import accept_records, list_recent
+from infra_pulse.iphone import IPhoneMotion
+from infra_pulse.models import GeoPoint
 from infra_pulse.offline import Outbox, drain
+from infra_pulse.scene_store import ingest_scan
 from infra_pulse.simulate import run_demo
 
 DATA = ROOT / "data" / "demo_run.json"
@@ -59,7 +64,33 @@ def api_run(refresh: bool = False):
 
 @app.get("/api/health")
 def health():
-    return {"ok": True, "product": "InfraPulse", "online": True}
+    return {"ok": True, "product": "InfraPulse", "capture": "iphone-pro-max", "online": True}
+
+
+class SceneIngest(BaseModel):
+    contributor_id: str
+    lat: float
+    lon: float
+    heading_deg: float = 0.0
+    xyz: list[list[float]]
+    pitch: float = 0.0
+    roll: float = 0.0
+    baro_hpa: float | None = None
+    notes: str = ""
+
+
+@app.post("/api/scene")
+def scene_ingest(body: SceneIngest):
+    loc = GeoPoint(lat=body.lat, lon=body.lon, heading_deg=body.heading_deg)
+    motion = IPhoneMotion(pitch=body.pitch, roll=body.roll, baro_hpa=body.baro_hpa)
+    result = ingest_scan(
+        loc,
+        np.asarray(body.xyz, dtype=float),
+        body.contributor_id,
+        extra={"notes": body.notes} if body.notes else None,
+        motion=motion,
+    )
+    return result.model_dump()
 
 
 @app.post("/api/ingest")

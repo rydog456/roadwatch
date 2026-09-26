@@ -5,11 +5,12 @@ from dataclasses import dataclass
 
 @dataclass(frozen=True)
 class FusionWeights:
-    vision: float = 0.30
-    lidar: float = 0.25
-    imu: float = 0.15
-    thermal: float = 0.10
-    deterioration: float = 0.20
+    vision: float = 0.22
+    lidar: float = 0.32
+    imu: float = 0.16
+    thermal: float = 0.0
+    deterioration: float = 0.12
+    la_prior: float = 0.18
 
 
 # IMU trigger: capture high-res frames when |az| exceeds this (g)
@@ -37,11 +38,22 @@ YOLO_IMGSZ = 640
 YOLO_LABEL_MAP = {
     "pothole": "pothole",
     "crack": "crack",
-    "alligator crack": "crack",
+    "alligator crack": "alligator_crack",
+    "alligator_crack": "alligator_crack",
+    "fatigue crack": "alligator_crack",
     "longitudinal crack": "crack",
     "transverse crack": "crack",
+    "edge crack": "edge_crack",
     "patch": "patch",
     "raveling": "raveling",
+    "rut": "rutting",
+    "rutting": "rutting",
+    "shoving": "shoving",
+    "root uplift": "root_uplift",
+    "utility settlement": "utility_settlement",
+    "joint fault": "joint_fault",
+    "spalling": "spalling",
+    "ponding": "ponding",
     "distress": "other_distress",
 }
 

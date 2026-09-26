@@ -1,4 +1,7 @@
-"""Edge logger: always write locally; sync later when a radio returns.
+"""DEPRECATED: Pi hardware logger.
+
+InfraPulse capture is now iPhone Pro / Pro Max (LiDAR + Core Motion + GPS).
+Keep this file only if you still have a lab Pi. Do not use it for the product path.
 
     python hardware/pi_collector.py --hub http://127.0.0.1:8000
 """

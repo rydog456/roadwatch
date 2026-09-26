@@ -112,6 +112,12 @@ def lidar_analyze(xyz: np.ndarray) -> LidarResult:
             rut = max(0.0, float(np.max(means)))
     depth_mm = depth_m * 1000.0
     rut_mm = rut * 1000.0
+    hole = below > max(0.008, 0.4 * depth_m)
+    length_m = width_m = 0.0
+    if int(hole.sum()) >= 3:
+        hp = pts[hole]
+        length_m = max(float(np.ptp(hp[:, 0])), 0.05)
+        width_m = max(float(np.ptp(hp[:, 1])), 0.05)
     # Approximate depressed volume using mean negative deviation * footprint
     neg = below[below > 0.005]
     volume = float(np.mean(neg) * (len(neg) / max(len(pts), 1)) * 2.0) if len(neg) else 0.0
@@ -128,4 +134,6 @@ def lidar_analyze(xyz: np.ndarray) -> LidarResult:
         volume_m3=volume,
         severity=sev,
         point_count=int(len(pts)),
+        length_m=round(length_m, 3),
+        width_m=round(width_m, 3),
     )

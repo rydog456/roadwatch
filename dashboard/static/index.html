@@ -18,6 +18,11 @@
     .card { background: #121b2e; border: 1px solid #243353; border-radius: 10px; padding: 10px 12px; min-width: 110px; }
     .card b { display: block; font-size: 20px; }
     .row { background: #121b2e; border: 1px solid #243353; border-radius: 10px; padding: 10px 12px; margin-bottom: 8px; }
+    .scan { background: #121b2e; border: 1px solid #243353; border-radius: 10px; padding: 12px; margin: 12px 0; }
+    .scan label { display: block; font-size: 12px; color: #8ba0bf; margin-top: 8px; }
+    .scan input { width: 100%; box-sizing: border-box; background: #0b1220; color: #e8eef7; border: 1px solid #243353; border-radius: 6px; padding: 6px 8px; }
+    .cost-grid { display: flex; gap: 8px; flex-wrap: wrap; margin: 8px 0; }
+    iframe.calc { width: 100%; height: 560px; border: none; border-radius: 8px; background: #fff; }
     .tag { display: inline-block; font-size: 11px; padding: 2px 8px; border-radius: 99px; text-transform: uppercase; }
     .high, .emergency { background: #5b1d2a; color: #ffb4c1; }
     .medium { background: #4a3b12; color: #ffd978; }
@@ -42,6 +47,22 @@
     <div id="map"></div>
     <aside>
       <div class="kpi" id="kpis"></div>
+      <h3>Scan a pothole</h3>
+      <form class="scan" id="scan-form">
+        <label>Who scanned</label>
+        <input id="who" value="ryan" />
+        <label>Latitude</label>
+        <input id="lat" value="34.0522" />
+        <label>Longitude</label>
+        <input id="lon" value="-118.2437" />
+        <p class="muted">LiDAR dimensions come from the merged cloud. GPS is saved on the city map.</p>
+        <button type="button" id="scan">Scan demo pothole</button>
+        <div id="scan-result"></div>
+        <div id="calc-wrap" hidden>
+          <iframe class="calc" src="https://asphapro.com/embed/pothole-repair-cost-calculator.html" title="Pothole Repair Cost Calculator – How Much Does It Cost to Fix a Pothole?" loading="lazy"></iframe>
+          <p style="font-size:13px;text-align:center;margin-top:8px">Powered by <a href="https://asphapro.com/pothole-repair-cost-calculator.html" rel="dofollow">Pothole Repair Cost Calculator – How Much Does It Cost to Fix a Pothole?</a> — <a href="https://asphapro.com" rel="dofollow">Asphapro.com</a></p>
+        </div>
+      </form>
       <h3>Ranked queue</h3>
       <div id="list"></div>
       <h3>Crew coverage</h3>
@@ -56,6 +77,7 @@
     const map = L.map("map").setView([34.055, -118.246], 14);
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19 }).addTo(map);
     let layer = L.layerGroup().addTo(map);
+    let cityLayer = L.layerGroup().addTo(map);
     const colors = { emergency: "#ff4d6d", high: "#ff7a59", medium: "#ffd166", low: "#70e000", monitor: "#4cc9f0" };
 
     function render(data) {
@@ -120,7 +142,72 @@
         console.error(err);
       }
       loadOutbox();
+      loadCity();
     }
+    function demoCloud() {
+      const pts = [];
+      for (let i = 0; i < 420; i++) {
+        const x = (Math.random() - 0.5) * 2.4;
+        const y = (Math.random() - 0.5) * 1.2;
+        let z = (Math.random() - 0.5) * 0.004;
+        if (Math.abs(x) < 0.4 && Math.abs(y) < 0.25) z -= 0.05;
+        pts.push([+x.toFixed(4), +y.toFixed(4), +z.toFixed(4)]);
+      }
+      return pts;
+    }
+
+    function money(n) { return "$" + Number(n || 0).toFixed(0); }
+
+    async function scanDemo() {
+      const btn = document.getElementById("scan");
+      btn.disabled = true;
+      document.getElementById("scan-result").textContent = "Scanning…";
+      try {
+        const r = await fetch("/api/scene", {
+          method: "POST",
+          headers: {"Content-Type": "application/json"},
+          body: JSON.stringify({
+            contributor_id: document.getElementById("who").value || "walker",
+            lat: Number(document.getElementById("lat").value),
+            lon: Number(document.getElementById("lon").value),
+            xyz: demoCloud(),
+            notes: "lidar pothole",
+          }),
+        });
+        const body = await r.json();
+        const c = body.cost || {};
+        const factors = Object.entries(c.factors || {})
+          .map(([k, v]) => `${k} ${Math.round((v.severity || 0) * 100)}%`)
+          .join(" · ");
+        document.getElementById("scan-result").innerHTML = `
+          <div class="cost-grid">
+            <div class="card"><span class="muted">LiDAR</span><b>${c.length_ft}×${c.width_ft} ft</b><span class="muted">${c.depth_in} in deep</span></div>
+            <div class="card"><span class="muted">Base (calculator)</span><b>${money(c.base_usd)}</b></div>
+            <div class="card"><span class="muted">With LA factors</span><b>${money(c.adjusted_usd)}</b><span class="muted">+${Math.round((c.uplift || 0) * 100)}%</span></div>
+          </div>
+          <div class="muted">${factors || "No live factors"}</div>
+          <div class="muted">${c.note || ""}</div>`;
+        document.getElementById("calc-wrap").hidden = false;
+        loadCity();
+      } catch (err) {
+        document.getElementById("scan-result").textContent = "Scan failed";
+        console.error(err);
+      }
+      btn.disabled = false;
+    }
+
+    async function loadCity() {
+      cityLayer.clearLayers();
+      const data = await fetch("/api/city").then(r => r.json()).catch(() => ({defects: []}));
+      (data.defects || []).forEach(d => {
+        const cost = d.cost || {};
+        L.circleMarker([d.lat, d.lon], { radius: 7, color: "#c4b5fd", fillOpacity: 0.9 })
+          .bindPopup(`<b>${d.scene_id || "scan"}</b><br>${d.depth_mm} mm · ${d.contributor_id}<br>base ${money(cost.base_usd)} · adjusted ${money(cost.adjusted_usd)}`)
+          .addTo(cityLayer);
+      });
+    }
+
+    document.getElementById("scan").onclick = scanDemo;
     document.getElementById("refresh").onclick = () => load(true);
     document.getElementById("sync").onclick = async () => {
       await fetch("/api/sync-now", {method: "POST"});

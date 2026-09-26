@@ -17,6 +17,8 @@ from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
+from infra_pulse.city_store import defect_record, load_defects, upsert_defect
+from infra_pulse.costing import estimate_repair
 from infra_pulse.hub import accept_records, list_recent
 from infra_pulse.iphone import IPhoneMotion
 from infra_pulse.models import GeoPoint
@@ -25,6 +27,7 @@ from infra_pulse.scene_store import ingest_scan
 from infra_pulse.simulate import run_demo
 
 DATA = ROOT / "data" / "demo_run.json"
+CITY = ROOT / "data" / "city_map.json"
 STATIC = Path(__file__).resolve().parent / "static"
 DEVICE_DB = ROOT / "data" / "device_outbox.sqlite"
 HUB_DB = ROOT / "data" / "hub.sqlite"
@@ -77,6 +80,9 @@ class SceneIngest(BaseModel):
     roll: float = 0.0
     baro_hpa: float | None = None
     notes: str = ""
+    live_factors: bool = True
+    landslide_risk: float = 0.0
+    wildfire_risk: float = 0.0
 
 
 @app.post("/api/scene")
@@ -90,7 +96,24 @@ def scene_ingest(body: SceneIngest):
         extra={"notes": body.notes} if body.notes else None,
         motion=motion,
     )
-    return result.model_dump()
+    estimate = estimate_repair(
+        result,
+        body.lat,
+        body.lon,
+        fetch_live=body.live_factors,
+        landslide_risk=body.landslide_risk,
+        wildfire_risk=body.wildfire_risk,
+    )
+    record = upsert_defect(
+        defect_record(result, body.lat, body.lon, body.contributor_id, estimate.model_dump(), body.notes),
+        CITY,
+    )
+    return {"lidar": result.model_dump(), "cost": estimate.model_dump(), "map": record}
+
+
+@app.get("/api/city")
+def city_map():
+    return {"defects": load_defects(CITY)}
 
 
 @app.post("/api/ingest")

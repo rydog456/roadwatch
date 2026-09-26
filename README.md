@@ -59,7 +59,9 @@ python scripts/prepare_llm_training.py
 
 Open http://127.0.0.1:8000
 
-POST two walks of the same block: `POST /api/scene` with `contributor_id`, `lat`, `lon`, `heading_deg`, and `xyz` points.
+POST a walk: `POST /api/scene` with `contributor_id`, `lat`, `lon`, and `xyz`. The response includes LiDAR length, width, and depth, an Asphapro-style **base** repair cost, and an **adjusted** cost. GPS is stored in `data/city_map.json` and drawn on the city map. After a scan the dashboard shows the Asphapro calculator.
+
+External uplift (weights sum to 1, cap 85%): traffic 0.26 (TomTom if `INFRA_PULSE_TOMTOM_KEY`, else OpenStreetMap road class), weather 0.22 (Open-Meteo rain and heat), drainage 0.18 (rain plus NWS flood alerts), seismic 0.18 (USGS, 30 days), ground movement 0.12 (hillside flag, or a bump after a nearby M3.5+), wildfire 0.04 (NWS fire weather, or a caller flag).
 
 Capture checklist: `hardware/PARTS.md`. Field tests: `docs/TESTING_PLAN.md`.
 

@@ -96,6 +96,8 @@ class LidarResult(BaseModel):
     point_count: int = 0
     contributors: int = 1
     scene_id: Optional[str] = None
+    length_m: float = 0.0
+    width_m: float = 0.0
 
 
 class GeoPoint(BaseModel):

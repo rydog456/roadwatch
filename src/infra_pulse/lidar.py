@@ -4,6 +4,7 @@ from pathlib import Path
 
 import numpy as np
 
+from infra_pulse.cloud_clean import ground_plane, remove_statistical_outliers
 from infra_pulse.config import LIDAR_POTHOLE_MM, LIDAR_RUT_MM
 from infra_pulse.models import LidarResult
 
@@ -139,18 +140,6 @@ def voxel_merge(a: np.ndarray, b: np.ndarray, voxel_m: float = 0.02) -> np.ndarr
     return np.vstack(list(buckets.values())) if buckets else np.zeros((0, 3))
 
 
-def _fit_plane(xyz: np.ndarray) -> tuple[np.ndarray, float]:
-    """Least-squares plane n·x + d = 0 with n unit, z-up preferred."""
-    pts = np.asarray(xyz, dtype=float)
-    centroid = pts.mean(axis=0)
-    _, _, vh = np.linalg.svd(pts - centroid, full_matrices=False)
-    normal = vh[-1]
-    if normal[2] < 0:
-        normal = -normal
-    d = -float(np.dot(normal, centroid))
-    return normal, d
-
-
 def lidar_analyze(xyz: np.ndarray) -> LidarResult:
     """Estimate pothole/rut depth as deviation below the fitted road plane.
 
@@ -164,8 +153,11 @@ def lidar_analyze(xyz: np.ndarray) -> LidarResult:
     pts = pts[np.isfinite(pts).all(axis=1)]
     if len(pts) < 20:
         return empty
+    pts = remove_statistical_outliers(pts)
+    if len(pts) < 20:
+        return empty
     try:
-        normal, d = _fit_plane(pts)
+        normal, d = ground_plane(pts)
     except np.linalg.LinAlgError:
         return empty
     signed = pts @ normal + d

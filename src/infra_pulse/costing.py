@@ -16,6 +16,7 @@ from __future__ import annotations
 import json
 import math
 import os
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone
 from typing import Any, Callable
 from urllib import parse, request
@@ -222,6 +223,17 @@ def _alerts(lat: float, lon: float, fetch: Callable[[str], Any]) -> dict[str, fl
     return {"drainage": flood, "wildfire": fire}
 
 
+def _guard(fn, *args, fallback):
+    try:
+        return fn(*args)
+    except Exception as exc:
+        if isinstance(fallback, dict):
+            copied = dict(fallback)
+            copied["error"] = type(exc).__name__
+            return copied
+        return fallback
+
+
 def load_external(
     lat: float,
     lon: float,
@@ -229,32 +241,26 @@ def load_external(
     landslide_risk: float = 0.0,
     wildfire_risk: float = 0.0,
 ) -> dict[str, Any]:
-    """Pull traffic, USGS, and weather. Missing APIs stay at severity 0."""
+    """Pull traffic, USGS, weather, and alerts together. A dead API stays at 0."""
     getter = fetch or _get_json
-    out: dict[str, Any] = {}
-    try:
-        out["traffic"] = _traffic_severity(lat, lon, getter)
-    except Exception as exc:
-        out["traffic"] = {"severity": 0.0, "source": "unavailable", "error": type(exc).__name__}
-    try:
-        out["seismic"] = _seismic_severity(lat, lon, getter)
-    except Exception as exc:
-        out["seismic"] = {"severity": 0.0, "source": "unavailable", "error": type(exc).__name__}
-    try:
-        weather, drainage = _weather_severity(lat, lon, getter)
-        out["weather"] = weather
-        out["drainage"] = drainage
-    except Exception as exc:
-        out["weather"] = {"severity": 0.0, "source": "unavailable", "error": type(exc).__name__}
-        out["drainage"] = {"severity": 0.0, "source": "unavailable", "error": type(exc).__name__}
-    try:
-        alerts = _alerts(lat, lon, getter)
-        if alerts["drainage"] > float(out["drainage"].get("severity") or 0):
-            out["drainage"]["severity"] = alerts["drainage"]
-            out["drainage"]["source"] = "weather.gov"
-        alert_fire = alerts["wildfire"]
-    except Exception:
-        alert_fire = 0.0
+    miss = {"severity": 0.0, "source": "unavailable"}
+    with ThreadPoolExecutor(max_workers=4) as pool:
+        traffic_f = pool.submit(_guard, _traffic_severity, lat, lon, getter, fallback=miss)
+        seismic_f = pool.submit(_guard, _seismic_severity, lat, lon, getter, fallback=miss)
+        weather_f = pool.submit(_guard, _weather_severity, lat, lon, getter, fallback=None)
+        alerts_f = pool.submit(_guard, _alerts, lat, lon, getter, fallback={"drainage": 0.0, "wildfire": 0.0})
+        out: dict[str, Any] = {"traffic": traffic_f.result(), "seismic": seismic_f.result()}
+        weather = weather_f.result()
+        alerts = alerts_f.result()
+    if isinstance(weather, tuple):
+        out["weather"], out["drainage"] = weather
+    else:
+        out["weather"] = dict(miss)
+        out["drainage"] = dict(miss)
+    if alerts["drainage"] > float(out["drainage"].get("severity") or 0):
+        out["drainage"]["severity"] = alerts["drainage"]
+        out["drainage"]["source"] = "weather.gov"
+    alert_fire = float(alerts.get("wildfire") or 0)
     ground = min(1.0, max(0.0, float(landslide_risk)))
     if ground == 0.0 and float(out["seismic"].get("severity") or 0) >= 0.65:
         ground = 0.25

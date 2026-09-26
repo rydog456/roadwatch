@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import sys
+import base64
 from pathlib import Path
 
 import numpy as np
@@ -12,15 +13,16 @@ SRC = ROOT / "src"
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from infra_pulse.city_store import defect_record, load_defects, upsert_defect
 from infra_pulse.costing import estimate_repair
 from infra_pulse.hub import accept_records, list_recent
-from infra_pulse.iphone import IPhoneMotion
+from infra_pulse.iphone import IPhoneMotion, pose_quality, scan_trust
+from infra_pulse.lidar import cap_points, read_ply_bytes, to_meters
 from infra_pulse.models import GeoPoint
 from infra_pulse.offline import Outbox, drain
 from infra_pulse.scene_store import ingest_scan
@@ -75,7 +77,8 @@ class SceneIngest(BaseModel):
     lat: float
     lon: float
     heading_deg: float = 0.0
-    xyz: list[list[float]]
+    xyz: list[list[float]] = Field(default_factory=list)
+    ply_b64: str = ""
     pitch: float = 0.0
     roll: float = 0.0
     baro_hpa: float | None = None
@@ -83,18 +86,31 @@ class SceneIngest(BaseModel):
     live_factors: bool = True
     landslide_risk: float = 0.0
     wildfire_risk: float = 0.0
+    gyro_xyz: list[list[float]] = Field(default_factory=list)
+    accel_xyz: list[list[float]] = Field(default_factory=list)
+    arkit_tracking: str = "normal"
+    mag_heading_deg: float | None = None
 
 
-@app.post("/api/scene")
-def scene_ingest(body: SceneIngest):
+def _store_scan(body: SceneIngest, xyz: np.ndarray) -> dict:
     loc = GeoPoint(lat=body.lat, lon=body.lon, heading_deg=body.heading_deg)
-    motion = IPhoneMotion(pitch=body.pitch, roll=body.roll, baro_hpa=body.baro_hpa)
+    motion = IPhoneMotion(
+        pitch=body.pitch,
+        roll=body.roll,
+        baro_hpa=body.baro_hpa,
+        gyro_xyz=body.gyro_xyz,
+        accel_xyz=body.accel_xyz,
+        arkit_tracking=body.arkit_tracking,
+        heading_deg=body.heading_deg,
+        mag_heading_deg=body.mag_heading_deg,
+    )
     result = ingest_scan(
         loc,
-        np.asarray(body.xyz, dtype=float),
+        cap_points(to_meters(xyz)),
         body.contributor_id,
         extra={"notes": body.notes} if body.notes else None,
         motion=motion,
+        align=not bool(body.ply_b64),
     )
     estimate = estimate_repair(
         result,
@@ -104,11 +120,41 @@ def scene_ingest(body: SceneIngest):
         landslide_risk=body.landslide_risk,
         wildfire_risk=body.wildfire_risk,
     )
+    pq = pose_quality(motion)
+    trust = scan_trust(pq, result.contributors, result.point_count)
+    if trust < 45:
+        estimate.note += " Low scan trust: hold the phone steady or add another walk of the same spot."
     record = upsert_defect(
-        defect_record(result, body.lat, body.lon, body.contributor_id, estimate.model_dump(), body.notes),
+        defect_record(
+            result,
+            body.lat,
+            body.lon,
+            body.contributor_id,
+            estimate.model_dump(),
+            body.notes,
+            pose_quality=pq,
+            heading_deg=body.heading_deg,
+        ),
         CITY,
     )
-    return {"lidar": result.model_dump(), "cost": estimate.model_dump(), "map": record}
+    return {"lidar": result.model_dump(), "cost": estimate.model_dump(), "map": record, "pose_quality": pq, "scan_trust": trust}
+
+
+@app.post("/api/scene")
+def scene_ingest(body: SceneIngest):
+    try:
+        if body.ply_b64:
+            xyz = read_ply_bytes(base64.b64decode(body.ply_b64))
+        else:
+            xyz = np.asarray(body.xyz, dtype=float) if body.xyz else np.zeros((0, 3))
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=f"Could not read that scan ({type(exc).__name__}).") from exc
+    if body.ply_b64 and len(xyz) < 20:
+        raise HTTPException(
+            status_code=400,
+            detail="No x,y,z vertices in that file. Export a PLY from the scanner app, not a photo.",
+        )
+    return _store_scan(body, xyz)
 
 
 @app.get("/api/city")

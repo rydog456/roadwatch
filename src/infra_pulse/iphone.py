@@ -74,6 +74,18 @@ def baro_z_offset_m(ref_hpa: float | None, hpa: float | None) -> float:
     return float(np.clip((ref_hpa - hpa) * 8.3, -1.5, 1.5))
 
 
+def scan_trust(pose: float, contributors: int, point_count: int) -> float:
+    """0-100 trust in this phone pass. A second walker and a dense cloud help."""
+    score = float(pose)
+    if contributors >= 2:
+        score += 10
+    if point_count < 80:
+        score -= 25
+    elif point_count < 200:
+        score -= 10
+    return float(np.clip(score, 0, 100))
+
+
 def pose_quality(motion: IPhoneMotion, sample_hz: float = 100.0) -> float:
     """How much to trust this LiDAR pass. Low if the phone was whipping around."""
     score = 70.0

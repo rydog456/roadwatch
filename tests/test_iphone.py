@@ -61,6 +61,29 @@ def test_ply_roundtrip(tmp_path: Path):
     assert len(merged) <= 2
 
 
+def test_binary_ply_xyz(tmp_path: Path):
+    from infra_pulse.lidar import read_ply_bytes
+
+    pts = np.array([[0.1, 0.2, -0.03], [0.4, -0.1, 0.0]], dtype=np.float32)
+    header = (
+        "ply\nformat binary_little_endian 1.0\n"
+        f"element vertex {len(pts)}\n"
+        "property float x\nproperty float y\nproperty float z\nend_header\n"
+    ).encode("ascii")
+    raw = header + pts.tobytes()
+    back = read_ply_bytes(raw)
+    assert len(back) == 2
+    assert abs(back[0, 2] - (-0.03)) < 1e-5
+
+
+def test_wild_gyro_lowers_scan_trust():
+    from infra_pulse.iphone import IPhoneMotion, pose_quality, scan_trust
+
+    wild = pose_quality(IPhoneMotion(gyro_xyz=[[2.0, 1.5, 1.2]] * 20, arkit_tracking="limited"))
+    calm = pose_quality(IPhoneMotion(gyro_xyz=[[0.05, 0.02, 0.01]] * 20))
+    assert scan_trust(wild, 1, 50) < scan_trust(calm, 2, 800)
+
+
 def test_heading_aligns_opposite_walks():
     pts = np.array([[1.0, 0.0, 0.0]])
     flipped = cloud_to_scene(pts, heading_deg=180, ref_heading_deg=0)

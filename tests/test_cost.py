@@ -45,7 +45,13 @@ def test_traffic_uplift_raises_professional_midpoint():
     assert abs(busy.uplift - FACTOR_WEIGHTS["traffic"]) < 1e-6
 
 
-def test_lidar_hole_has_plan_dimensions():
+def test_y_up_and_centimetre_exports_keep_depth():
+    from infra_pulse.lidar import lidar_analyze
+
+    hole = _hole()
+    y_up = hole[:, [0, 2, 1]]
+    assert lidar_analyze(y_up).depth_mm > 20
+    assert 20 < lidar_analyze(hole * 100).depth_mm < 200
     result = lidar_analyze(_hole())
     assert result.depth_mm > 20
     assert result.length_m > 0.2
@@ -92,5 +98,29 @@ def test_scene_api_stores_gps_and_both_costs(monkeypatch, tmp_path):
     assert body["cost"]["base_usd"] > 0
     assert body["cost"]["adjusted_usd"] == body["cost"]["base_usd"]
     assert body["map"]["lat"] == 34.0522
-    assert body["lidar"]["depth_mm"] > 20
+def test_scene_ply_upload(monkeypatch, tmp_path):
+    import base64
+    import dashboard.app as appmod
+    from fastapi.testclient import TestClient
+    from infra_pulse.lidar import write_ply
+
+    monkeypatch.setattr(appmod, "CITY", tmp_path / "city.json")
+    ply = tmp_path / "phone.ply"
+    write_ply(ply, _hole())
+    client = TestClient(appmod.app)
+    r = client.post(
+        "/api/scene",
+        json={
+            "contributor_id": "ryan",
+            "lat": 34.05,
+            "lon": -118.25,
+            "live_factors": False,
+            "ply_b64": base64.b64encode(ply.read_bytes()).decode("ascii"),
+        },
+    )
+    assert r.status_code == 200
+    body = r.json()
+    assert body["cost"]["base_usd"] > 0
+    assert "scan_trust" in body
+    assert body["map"]["pose_quality"] > 0
 

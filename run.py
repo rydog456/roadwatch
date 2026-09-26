@@ -31,9 +31,23 @@ def main() -> None:
         import pytest
 
         raise SystemExit(pytest.main(["tests", "-q"]))
+    import socket
     import uvicorn
 
-    uvicorn.run("dashboard.app:app", host="127.0.0.1", port=args.port, reload=False)
+    def _lan_ip() -> str:
+        try:
+            sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            sock.connect(("8.8.8.8", 80))
+            ip = sock.getsockname()[0]
+            sock.close()
+            return ip
+        except OSError:
+            return "this-pc"
+
+    lan = _lan_ip()
+    print(f"On this PC:  http://127.0.0.1:{args.port}", flush=True)
+    print(f"On the iPhone (same Wi-Fi):  http://{lan}:{args.port}", flush=True)
+    uvicorn.run("dashboard.app:app", host="0.0.0.0", port=args.port, reload=False)
 
 
 if __name__ == "__main__":

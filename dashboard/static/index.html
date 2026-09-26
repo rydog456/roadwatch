@@ -29,6 +29,14 @@
     .low, .monitor { background: #163326; color: #9be7b7; }
     .delayed { background: #2a2150; color: #cbb6ff; }
     button { background: #2f6fed; color: white; border: 0; border-radius: 8px; padding: 8px 12px; cursor: pointer; }
+    .scan .actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+    @media (max-width: 800px) {
+      header { flex-direction: column; align-items: flex-start; gap: 8px; }
+      main { display: flex; flex-direction: column; }
+      aside { order: -1; border-left: 0; border-bottom: 1px solid #1e2a44; }
+      #map { min-height: 240px; }
+      .scan input { font-size: 16px; }
+    }
     header .actions { display: flex; gap: 8px; }
   </style>
 </head>
@@ -48,15 +56,21 @@
     <aside>
       <div class="kpi" id="kpis"></div>
       <h3>Scan a pothole</h3>
-      <form class="scan" id="scan-form">
+      <form class="scan" id="scan-form" onsubmit="return false">
         <label>Who scanned</label>
         <input id="who" value="ryan" />
         <label>Latitude</label>
         <input id="lat" value="34.0522" />
         <label>Longitude</label>
         <input id="lon" value="-118.2437" />
-        <p class="muted">LiDAR dimensions come from the merged cloud. GPS is saved on the city map.</p>
-        <button type="button" id="scan">Scan demo pothole</button>
+        <label>iPhone LiDAR file (.ply)</label>
+        <input id="ply" type="file" accept="*/*" />
+        <p class="muted">On the iPhone, open this page from the laptop address printed in the terminal, same Wi-Fi. Export a PLY from 3D Scanner or Polycam. If GPS is blocked, type the pin from Maps.</p>
+        <div class="actions">
+          <button type="button" id="gps">Use this phone's GPS</button>
+          <button type="button" id="scan">Scan demo pothole</button>
+          <button type="button" id="upload">Upload PLY</button>
+        </div>
         <div id="scan-result"></div>
         <div id="calc-wrap" hidden>
           <iframe class="calc" src="https://asphapro.com/embed/pothole-repair-cost-calculator.html" title="Pothole Repair Cost Calculator – How Much Does It Cost to Fix a Pothole?" loading="lazy"></iframe>
@@ -158,11 +172,70 @@
 
     function money(n) { return "$" + Number(n || 0).toFixed(0); }
 
+    function showScan(body) {
+      const c = body.cost || {};
+      const factors = Object.entries(c.factors || {})
+        .map(([k, v]) => (v.source === "unavailable" ? `${k} n/a` : `${k} ${Math.round((v.severity || 0) * 100)}%`))
+        .join(" · ");
+      document.getElementById("scan-result").innerHTML = `
+        <div class="cost-grid">
+          <div class="card"><span class="muted">LiDAR</span><b>${c.length_ft}×${c.width_ft} ft</b><span class="muted">${c.depth_in} in deep</span></div>
+          <div class="card"><span class="muted">Base (calculator)</span><b>${money(c.base_usd)}</b></div>
+          <div class="card"><span class="muted">With LA factors</span><b>${money(c.adjusted_usd)}</b><span class="muted">+${Math.round((c.uplift || 0) * 100)}%</span></div>
+          <div class="card"><span class="muted">Scan trust</span><b>${Math.round(body.scan_trust || 0)}</b><span class="muted">pose ${Math.round(body.pose_quality || 0)}</span></div>
+        </div>
+        <div class="muted">${factors || "No live factors"}</div>
+        <div class="muted">${c.note || ""}</div>`;
+      document.getElementById("calc-wrap").hidden = false;
+      loadCity();
+    }
+
+    async function phonePose() {
+      const pose = { pitch: 0, roll: 0, heading_deg: Number(document.getElementById("heading")?.value || 0) };
+      try {
+        if (typeof DeviceOrientationEvent !== "undefined" && typeof DeviceOrientationEvent.requestPermission === "function") {
+          await DeviceOrientationEvent.requestPermission();
+        }
+      } catch (err) { /* desktop or denied */ }
+      const ev = await new Promise(resolve => {
+        const timer = setTimeout(() => resolve(null), 600);
+        window.addEventListener("deviceorientation", event => {
+          clearTimeout(timer);
+          resolve(event);
+        }, { once: true });
+      });
+      if (!ev) return pose;
+      const beta = Number(ev.beta || 0);
+      const gamma = Number(ev.gamma || 0);
+      pose.pitch = beta * Math.PI / 180;
+      pose.roll = gamma * Math.PI / 180;
+      if (ev.webkitCompassHeading != null && Number.isFinite(Number(ev.webkitCompassHeading))) {
+        pose.heading_deg = Number(ev.webkitCompassHeading);
+      }
+      return pose;
+    }
+
+    document.getElementById("gps").onclick = () => {
+      if (!navigator.geolocation) {
+        document.getElementById("scan-result").textContent = "This browser has no GPS.";
+        return;
+      }
+      navigator.geolocation.getCurrentPosition(pos => {
+        document.getElementById("lat").value = pos.coords.latitude.toFixed(6);
+        document.getElementById("lon").value = pos.coords.longitude.toFixed(6);
+        document.getElementById("scan-result").textContent = "GPS saved for the next scan.";
+      }, () => {
+        document.getElementById("scan-result").textContent = "GPS permission denied. Type the pin instead.";
+      }, { enableHighAccuracy: true, timeout: 8000 });
+    };
+
     async function scanDemo() {
       const btn = document.getElementById("scan");
       btn.disabled = true;
       document.getElementById("scan-result").textContent = "Scanning…";
+      const posePromise = phonePose();
       try {
+        const pose = await posePromise;
         const r = await fetch("/api/scene", {
           method: "POST",
           headers: {"Content-Type": "application/json"},
@@ -170,27 +243,65 @@
             contributor_id: document.getElementById("who").value || "walker",
             lat: Number(document.getElementById("lat").value),
             lon: Number(document.getElementById("lon").value),
+            heading_deg: pose.heading_deg,
+            pitch: pose.pitch,
+            roll: pose.roll,
             xyz: demoCloud(),
             notes: "lidar pothole",
           }),
         });
-        const body = await r.json();
-        const c = body.cost || {};
-        const factors = Object.entries(c.factors || {})
-          .map(([k, v]) => `${k} ${Math.round((v.severity || 0) * 100)}%`)
-          .join(" · ");
-        document.getElementById("scan-result").innerHTML = `
-          <div class="cost-grid">
-            <div class="card"><span class="muted">LiDAR</span><b>${c.length_ft}×${c.width_ft} ft</b><span class="muted">${c.depth_in} in deep</span></div>
-            <div class="card"><span class="muted">Base (calculator)</span><b>${money(c.base_usd)}</b></div>
-            <div class="card"><span class="muted">With LA factors</span><b>${money(c.adjusted_usd)}</b><span class="muted">+${Math.round((c.uplift || 0) * 100)}%</span></div>
-          </div>
-          <div class="muted">${factors || "No live factors"}</div>
-          <div class="muted">${c.note || ""}</div>`;
-        document.getElementById("calc-wrap").hidden = false;
-        loadCity();
+        if (!r.ok) {
+          const err = await r.json().catch(() => ({}));
+          throw new Error(err.detail || ("scan " + r.status));
+        }
+        showScan(await r.json());
       } catch (err) {
         document.getElementById("scan-result").textContent = "Scan failed";
+        console.error(err);
+      }
+      btn.disabled = false;
+    }
+
+    async function uploadPly() {
+      const file = document.getElementById("ply").files[0];
+      if (!file) {
+        document.getElementById("scan-result").textContent = "Choose a .ply from the phone first.";
+        return;
+      }
+      const btn = document.getElementById("upload");
+      btn.disabled = true;
+      document.getElementById("scan-result").textContent = "Reading LiDAR…";
+      const posePromise = phonePose();
+      try {
+        const dataUrl = await new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result);
+          reader.onerror = () => reject(reader.error);
+          reader.readAsDataURL(file);
+        });
+        const pose = await posePromise;
+        const encoded = String(dataUrl).split(",")[1] || "";
+        const r = await fetch("/api/scene", {
+          method: "POST",
+          headers: {"Content-Type": "application/json"},
+          body: JSON.stringify({
+            contributor_id: document.getElementById("who").value || "walker",
+            lat: Number(document.getElementById("lat").value),
+            lon: Number(document.getElementById("lon").value),
+            heading_deg: pose.heading_deg,
+            pitch: pose.pitch,
+            roll: pose.roll,
+            ply_b64: encoded,
+            notes: "iphone ply",
+          }),
+        });
+        if (!r.ok) {
+          const err = await r.json().catch(() => ({}));
+          throw new Error(err.detail || ("ply " + r.status));
+        }
+        showScan(await r.json());
+      } catch (err) {
+        document.getElementById("scan-result").textContent = err.message || "PLY upload failed";
         console.error(err);
       }
       btn.disabled = false;
@@ -208,6 +319,7 @@
     }
 
     document.getElementById("scan").onclick = scanDemo;
+    document.getElementById("upload").onclick = uploadPly;
     document.getElementById("refresh").onclick = () => load(true);
     document.getElementById("sync").onclick = async () => {
       await fetch("/api/sync-now", {method: "POST"});

@@ -28,17 +28,21 @@ def defect_record(
     contributor_id: str,
     cost: dict[str, Any],
     notes: str = "",
+    pose_quality: float = 50,
+    heading_deg: float = 0,
 ) -> dict[str, Any]:
     return {
         "scene_id": lidar.scene_id,
         "lat": lat,
         "lon": lon,
+        "heading_deg": heading_deg,
         "contributor_id": contributor_id,
         "contributors": lidar.contributors,
         "depth_mm": round(float(lidar.depth_mm), 1),
         "length_m": round(float(lidar.length_m), 3),
         "width_m": round(float(lidar.width_m), 3),
         "point_count": int(lidar.point_count),
+        "pose_quality": round(float(pose_quality), 1),
         "cost": cost,
         "notes": notes,
     }

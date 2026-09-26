@@ -66,6 +66,7 @@ def ingest_scan(
     extra: dict[str, Any] | None = None,
     root: Path | None = None,
     motion: IPhoneMotion | None = None,
+    align: bool = True,
 ) -> LidarResult:
     sid = scene_id_for(location.lat, location.lon)
     folder = _root(root) / sid
@@ -77,14 +78,22 @@ def ingest_scan(
     motion = motion or IPhoneMotion()
     if meta.get("ref_baro_hpa") is None and motion.baro_hpa is not None:
         meta["ref_baro_hpa"] = motion.baro_hpa
-    aligned = cloud_to_scene(
-        xyz,
-        heading_deg=heading,
-        ref_heading_deg=float(meta["ref_heading_deg"]),
-        pitch=motion.pitch,
-        roll=motion.roll,
-        z_offset_m=baro_z_offset_m(meta.get("ref_baro_hpa"), motion.baro_hpa),
-    )
+    raw = np.asarray(xyz, dtype=float)
+    if raw.ndim != 2 or raw.shape[-1] < 3 or len(raw) == 0:
+        raw = np.zeros((0, 3))
+    else:
+        raw = raw[:, :3]
+    if align:
+        aligned = cloud_to_scene(
+            raw,
+            heading_deg=heading,
+            ref_heading_deg=float(meta["ref_heading_deg"]),
+            pitch=motion.pitch,
+            roll=motion.roll,
+            z_offset_m=baro_z_offset_m(meta.get("ref_baro_hpa"), motion.baro_hpa),
+        )
+    else:
+        aligned = raw
     stamp = int(time.time() * 1000)
     ply_name = f"contrib_{contributor_id}_{stamp}.ply"
     write_ply(folder / ply_name, aligned)

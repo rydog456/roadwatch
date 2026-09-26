@@ -90,6 +90,7 @@ class SceneIngest(BaseModel):
     accel_xyz: list[list[float]] = Field(default_factory=list)
     arkit_tracking: str = "normal"
     mag_heading_deg: float | None = None
+    capture: str = ""
 
 
 def _store_scan(body: SceneIngest, xyz: np.ndarray) -> dict:
@@ -104,13 +105,14 @@ def _store_scan(body: SceneIngest, xyz: np.ndarray) -> dict:
         heading_deg=body.heading_deg,
         mag_heading_deg=body.mag_heading_deg,
     )
+    extra = {k: v for k, v in (("notes", body.notes), ("capture", body.capture)) if v}
     result = ingest_scan(
         loc,
         cap_points(to_meters(xyz)),
         body.contributor_id,
-        extra={"notes": body.notes} if body.notes else None,
+        extra=extra or None,
         motion=motion,
-        align=not bool(body.ply_b64),
+        align=not (body.ply_b64 or body.capture == "arkit"),
     )
     estimate = estimate_repair(
         result,
@@ -149,7 +151,7 @@ def scene_ingest(body: SceneIngest):
             xyz = np.asarray(body.xyz, dtype=float) if body.xyz else np.zeros((0, 3))
     except Exception as exc:
         raise HTTPException(status_code=400, detail=f"Could not read that scan ({type(exc).__name__}).") from exc
-    if body.ply_b64 and len(xyz) < 20:
+    if (body.ply_b64 or body.capture == "arkit") and len(xyz) < 20:
         raise HTTPException(
             status_code=400,
             detail="No x,y,z vertices in that file. Export a PLY from the scanner app, not a photo.",

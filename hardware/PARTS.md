@@ -10,7 +10,7 @@ Hardware boxes (Pi, MPU-6050, Pi camera) are **out of scope**. Capture is an **i
 | 1+ | People walking the same block | Each extra scan densifies `merged.ply` |
 | 1 | Laptop | Fusion, LLM, dashboard |
 
-Export from 3D Scanner App, Polycam, or a custom ARKit app as **ASCII PLY** plus a motion sidecar. InfraPulse stores `scene.ipulse.json` + `merged.ply` per GPS cell.
+Capture with **Polycam** or **Scaniverse** in LiDAR mode and export **PLY**. 3D Scanner App is acceptable. Photo mode and `.obj` meshes are not. On upload, Open3D removes statistical outliers and fits a RANSAC ground plane. If Open3D is not installed, the same two steps run in numpy. InfraPulse stores `scene.ipulse.json` + `merged.ply` per GPS cell.
 
 ## Phone sensors used
 

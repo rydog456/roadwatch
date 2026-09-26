@@ -65,7 +65,8 @@
         <input id="lon" value="-118.2437" inputmode="decimal" />
         <label>LiDAR file (.ply)</label>
         <input id="ply" type="file" accept="*/*" />
-        <p class="muted" id="hint">Export a PLY from 3D Scanner or Polycam, then upload it. The pin uses the coordinates above.</p>
+        <p class="muted" id="hint">Capture in Polycam or Scaniverse, LiDAR mode, and export PLY. Upload removes outlier points and fits the ground plane before the price. The pin uses the coordinates above.</p>
+        <p class="muted">Want the raw LiDAR mesh? Safari can't read the sensor. Build the InfraPulse Scanner app in <code>ios/InfraPulseScanner</code> (ARKit), point it at this page's address, and its scans land on this same map.</p>
         <button type="button" class="primary" id="upload">Upload scan</button>
         <div class="actions">
           <button type="button" id="gps">Use this phone's GPS</button>
@@ -275,7 +276,7 @@
 
     if (!window.isSecureContext) {
       document.getElementById("gps").hidden = true;
-      document.getElementById("hint").textContent = "GPS needs the Replit HTTPS page. On this address, type the pin from Maps, then upload the PLY.";
+      document.getElementById("hint").textContent = "GPS needs the Replit HTTPS page. Type the pin from Maps. Capture with Polycam or Scaniverse in LiDAR mode, then upload the PLY.";
     }
     document.getElementById("scan").onclick = scanDemo;
     document.getElementById("upload").onclick = uploadPly;

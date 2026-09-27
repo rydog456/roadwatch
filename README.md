@@ -1,4 +1,4 @@
-# InfraPulse
+# RoadWatch
 
 iPhone Pro / Pro Max **LiDAR + Core Motion** screening for pavement and nearby street structure. An **LLM** (few-shot trained on **Los Angeles** distress) classifies issues; fusion puts extra weight on alligator cracking, rutting, utility settlement, root uplift, shoving, and heat/UV raveling. Multiple people scanning the same GPS cell **merge ASCII PLY** files into a denser deterioration map.
 
